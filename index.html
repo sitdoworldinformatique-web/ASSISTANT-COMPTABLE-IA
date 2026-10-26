@@ -312,7 +312,8 @@ dashboard(){
   const reste=impayees.reduce((a,f)=>a+f.ttc,0);
   const recent=[...db.ecritures].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   const dv=esc(db.params.devise);
-  return `${db.ecritures.length?"":`<div class="card"><h2>Bienvenue 👋</h2><p class="mut">Commencez par renseigner votre entreprise dans <b>Paramètres</b>, puis enregistrez vos dépenses et recettes dans <b>Saisie</b>. Vous pouvez aussi essayer avec des données de démonstration.</p>
+  const negs=TRESO.filter(([c])=>sd(s,c)<=-0.005);
+  return `${negs.length?`<div class="msg bad">⚠️ Solde négatif : ${negs.map(([c,n])=>`<b>${n}</b> ${fmt(sd(s,c))} ${dv}`).join(", ")}. Il manque probablement une recette, un apport ou un virement.</div>`:""}${db.ecritures.length?"":`<div class="card"><h2>Bienvenue 👋</h2><p class="mut">Commencez par renseigner votre entreprise dans <b>Paramètres</b>, puis enregistrez vos dépenses et recettes dans <b>Saisie</b>. Vous pouvez aussi essayer avec des données de démonstration.</p>
    <div class="bar"><button class="btn p" onclick="go('saisie')">➕ Première saisie</button><button class="btn" onclick="demo()">Charger une démo</button><button class="btn" onclick="go('parametres')">⚙️ Paramètres</button></div></div>`}
   <div class="grid">
    <div class="card kpi" style="--c:var(--ok)"><span>Produits (recettes)</span><b>${fmt(r.prod)}</b><em>${dv} · ${libPeriode()}</em></div>
@@ -341,7 +342,7 @@ saisie(){
     <div class="w2"><label>Libellé</label><input id="ql" placeholder="Ex : Loyer octobre, crédit téléphone, vente…" oninput="qAide()"></div>
     <div><label>Montant (${esc(db.params.devise)})</label><input id="qm" type="number" min="0" step="0.01"></div>
     <div><label>Payé / encaissé par</label><select id="qp">${optionsTreso("571")}</select></div>
-    <div class="w2"><label>Compte (choisi automatiquement, modifiable)</label><select id="qc"></select></div>
+    <div class="w2"><label>Compte (choisi automatiquement, modifiable)</label><select id="qc" onchange="this.dataset.manuel='1';qAide()"></select></div>
     <div><label>N° pièce (facultatif)</label><input id="qn" placeholder="Reçu, ticket…"></div>
    </div>
    <div id="qaide"></div>
@@ -490,21 +491,26 @@ const estCharge=c=>(classe(c)==="6")||(classe(c)==="2"&&!c.startsWith("28"));
 function qType(){
   const dep=$("qt").value==="dep";
   $("qc").innerHTML=dep?optionsComptes(estCharge,"605"):optionsComptes(c=>classe(c)==="7","706");
+  $("qc").dataset.manuel="";
   qAide();
 }
 function qAide(){
-  const dep=$("qt").value==="dep",c=suggere($("ql").value);
-  if(c&&(dep?estCharge(c):classe(c)==="7")){$("qc").value=c;$("qaide").innerHTML=`<div class="hint">💡 Compte choisi : <b>${c} ${esc(nom(c))}</b></div>`}
-  else $("qaide").innerHTML="";
+  const dep=$("qt").value==="dep",lib=$("ql").value.trim(),c=suggere(lib),sel=$("qc");
+  // Un compte choisi à la main n'est jamais remplacé ; sinon il suit le libellé (et revient au compte par défaut).
+  if(!sel.dataset.manuel)sel.value=c&&(dep?estCharge(c):classe(c)==="7")?c:dep?"605":"706";
+  const v=sel.value,auto=c===v&&!sel.dataset.manuel;
+  $("qaide").innerHTML=!lib?"":auto?`<div class="hint">💡 Compte choisi : <b>${v} ${esc(nom(v))}</b></div>`
+    :`<div class="hint">${sel.dataset.manuel?"✋ Compte choisi par vous":"❔ Libellé non reconnu, compte par défaut"} : <b>${esc(v)} ${esc(nom(v))}</b>. Vérifiez qu'il convient.</div>`;
 }
 function qValider(){
   const dep=$("qt").value==="dep",date=$("qd").value,lib=$("ql").value.trim(),m=arr(parseFloat($("qm").value)||0),t=$("qp").value,c=$("qc").value;
   const err=[];if(!date)err.push("Date requise.");if(!lib)err.push("Libellé requis.");if(m<=0)err.push("Montant supérieur à 0 requis.");if(!c)err.push("Compte requis.");
   if(err.length){$("qres").innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
   const L=dep?[{compte:c,debit:m,credit:0},{compte:t,debit:0,credit:m}]:[{compte:t,debit:m,credit:0},{compte:c,debit:0,credit:m}];
+  if(!tresoOk(L,date))return;
   db.ecritures.push({id:uid(),date,piece:$("qn").value.trim(),libelle:lib,lignes:L});save();
   toast((dep?"Dépense":"Recette")+" enregistrée ✔");
-  ["ql","qm","qn"].forEach(i=>$(i).value="");$("qaide").innerHTML="";$("qres").innerHTML=`<div class="msg ok">${dep?"Dépense":"Recette"} « ${esc(lib)} » enregistrée ✔ Vous pouvez en saisir une autre.</div>`;$("ql").focus();
+  ["ql","qm","qn"].forEach(i=>$(i).value="");qType();$("qres").innerHTML=`<div class="msg ok">${dep?"Dépense":"Recette"} « ${esc(lib)} » enregistrée ✔ Vous pouvez en saisir une autre.</div>`;$("ql").focus();
 }
 
 // ---------- Saisie avancée ----------
@@ -539,21 +545,63 @@ function valider(){
     if(!l.debit&&!l.credit)err.push(n+"montant manquant.");
   });
   if(Math.abs(d-c)>=0.005)err.push("Débit et crédit doivent être égaux.");
+  const piece=$("pc").value.trim(),e=edition&&db.ecritures.find(x=>x.id===edition),lien=e&&lienFacture(e);
+  if(lien&&!err.length)err.push(...verifFacture(lien,piece,L));
   if(err.length){res.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
-  const piece=$("pc").value.trim(),e=edition&&db.ecritures.find(x=>x.id===edition);
-  if(e){Object.assign(e,{date,piece,libelle:lib,lignes:L});toast("Écriture modifiée ✔")}
+  if(!tresoOk(L,date,e&&e.id))return;
+  if(e){Object.assign(e,{date,piece,libelle:lib,lignes:L});if(lien)majFacture(lien,e);toast("Écriture modifiée ✔")}
   else{db.ecritures.push({id:uid(),date,piece,libelle:lib,lignes:L});toast("Écriture enregistrée ✔")}
   edition=null;save();go("journal");
 }
 function modifier(id){edition=id;go("saisie")}
 function supprimer(id){
   const e=db.ecritures.find(x=>x.id===id);if(!e)return;
-  if(!confirm(`Supprimer l'écriture « ${e.libelle} » du ${dfr(e.date)} ?`))return;
+  const lien=lienFacture(e);
+  if(lien&&lien.type==="facture"&&lien.f.payee){alert(`La facture ${lien.f.num} est déjà encaissée. Supprimez d'abord l'écriture d'encaissement, puis celle de la facture.`);return}
+  if(!confirm(`Supprimer l'écriture « ${e.libelle} » du ${dfr(e.date)} ?${lien?`\nLa facture ${lien.f.num} passera en « ${lien.type==="facture"?"Annulée":"À encaisser"} ».`:""}`))return;
   db.ecritures=db.ecritures.filter(x=>x.id!==id);
-  const f=db.factures.find(x=>x.num===e.piece);
-  if(f&&e.libelle.startsWith("Facture "))f.annulee=true;
-  if(f&&e.libelle.startsWith("Encaissement "))f.payee=null;
+  if(lien&&lien.type==="facture")lien.f.annulee=true;
+  if(lien&&lien.type==="encaissement")lien.f.payee=null;
   save();toast("Écriture supprimée");go("journal");
+}
+// Lien entre une écriture et sa facture (type « facture » ou « encaissement »).
+// Les anciennes écritures n'ont pas le champ « lien » : on le retrouve par le n° de pièce et le libellé.
+function lienFacture(e){
+  const f=db.factures.find(x=>x.num===e.piece);if(!f||f.annulee)return null;
+  const type=e.lien||(e.libelle.startsWith("Facture ")?"facture":e.libelle.startsWith("Encaissement ")?"encaissement":null);
+  return type?{f,type}:null;
+}
+const montant411=(L,k)=>arr(L.filter(l=>l.compte==="411").reduce((a,l)=>a+(l[k]||0),0));
+function verifFacture({f,type},piece,L){
+  const err=[];
+  if(piece!==f.num)err.push(`Cette écriture est liée à la facture ${esc(f.num)} : gardez le n° de pièce ${esc(f.num)}.`);
+  if(type==="facture"){
+    const ttc=montant411(L,"debit"),ht=arr(L.filter(l=>classe(l.compte)==="7").reduce((a,l)=>a+(l.credit||0),0));
+    if(ttc<=0||ht<=0)err.push("L'écriture d'une facture doit garder un débit au compte 411 (client) et un crédit en classe 7 (vente).");
+    else if(f.payee&&Math.abs(ttc-f.ttc)>=0.005)err.push(`La facture ${esc(f.num)} est déjà encaissée pour ${money(f.ttc)} : supprimez d'abord l'encaissement pour changer son montant.`);
+  }else if(Math.abs(montant411(L,"credit")-f.ttc)>=0.005)err.push(`L'encaissement doit créditer le compte 411 du montant de la facture (${money(f.ttc)}).`);
+  return err;
+}
+function majFacture({f,type},e){
+  e.lien=type;
+  if(type==="encaissement"){f.payee=e.date;return}
+  const L=e.lignes,ventes=L.filter(l=>classe(l.compte)==="7");
+  f.date=e.date;
+  f.ttc=montant411(L,"debit");
+  f.ht=arr(ventes.reduce((a,l)=>a+(l.credit||0),0));
+  f.tva=arr(L.filter(l=>l.compte==="4431").reduce((a,l)=>a+(l.credit||0)-(l.debit||0),0));
+  f.taux=f.ht?arr(f.tva/f.ht*100):0;
+  f.compte=ventes[0].compte;
+  if(e.libelle.startsWith("Facture ")&&e.libelle.slice(8).trim())f.client=e.libelle.slice(8).trim();
+}
+// Avertit avant qu'une écriture fasse passer la caisse, la banque ou le Mobile Money en négatif à sa date.
+function tresoOk(L,date,sauf){
+  const s=soldes(db.ecritures.filter(x=>x.id!==sauf&&x.date<=date));
+  const neg=TRESO.filter(([c])=>L.some(l=>l.compte===c&&l.credit>0))
+    .map(([c,n])=>[n,sd(s,c)+L.filter(l=>l.compte===c).reduce((a,l)=>a+(l.debit||0)-(l.credit||0),0)])
+    .filter(x=>x[1]<=-0.005);
+  if(!neg.length)return true;
+  return confirm(neg.map(([n,v])=>`⚠️ ${n} : le solde passerait à ${fmt(v)} ${db.params.devise} au ${dfr(date)}.`).join("\n")+"\n\nIl n'y a pas assez d'argent sur ce compte à cette date. Enregistrer quand même ?");
 }
 
 // ---------- Factures ----------
@@ -574,7 +622,7 @@ function facturer(){
   db.factures.push({num,date,client:cl,objet,taux:t,compte,ht,tva,ttc,payee:null});
   const L=[{compte:"411",debit:ttc,credit:0},{compte,debit:0,credit:ht}];
   if(tva)L.push({compte:"4431",debit:0,credit:tva});
-  db.ecritures.push({id:uid(),date,piece:num,libelle:"Facture "+cl,lignes:L});
+  db.ecritures.push({id:uid(),date,piece:num,libelle:"Facture "+cl,lien:"facture",lignes:L});
   save();go("factures");toast(`Facture ${num} créée ✔`);voirFacture(num);
 }
 function fermer(){$("modal").innerHTML="";document.body.classList.remove("mopen")}
@@ -607,7 +655,7 @@ function encaisser(num){
 }
 function confirmerEncaissement(num){
   const f=db.factures.find(x=>x.num===num),date=$("ed").value,c=$("ec").value;if(!f||!date)return;
-  db.ecritures.push({id:uid(),date,piece:f.num,libelle:"Encaissement "+f.num+" "+f.client,lignes:[{compte:c,debit:f.ttc,credit:0},{compte:"411",debit:0,credit:f.ttc}]});
+  db.ecritures.push({id:uid(),date,piece:f.num,libelle:"Encaissement "+f.num+" "+f.client,lien:"encaissement",lignes:[{compte:c,debit:f.ttc,credit:0},{compte:"411",debit:0,credit:f.ttc}]});
   f.payee=date;save();go("factures");toast("Paiement enregistré ✔");
 }
 
