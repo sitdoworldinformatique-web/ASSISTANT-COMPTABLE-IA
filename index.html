@@ -174,6 +174,33 @@ const PLAN = [
 ["812","Valeur des immobilisations cédées"],["822","Produits des cessions d'immobilisations"],["891","Impôts sur les bénéfices"]
 ];
 const CLASSES={"1":"Capitaux","2":"Immobilisations","3":"Stocks","4":"Tiers","5":"Trésorerie","6":"Charges","7":"Produits","8":"Hors activités ordinaires et impôts"};
+// Pays d'Afrique : [code ISO, nom, indicatif, devise, membre OHADA (SYSCOHADA applicable)]
+const PAYS=[
+ ["ZA","Afrique du Sud","27","ZAR"],["DZ","Algérie","213","DZD"],["AO","Angola","244","AOA"],["BJ","Bénin","229","XOF",1],
+ ["BW","Botswana","267","BWP"],["BF","Burkina Faso","226","XOF",1],["BI","Burundi","257","BIF"],["CM","Cameroun","237","XAF",1],
+ ["CV","Cap-Vert","238","CVE"],["CF","Centrafrique","236","XAF",1],["KM","Comores","269","KMF",1],["CG","Congo (Brazzaville)","242","XAF",1],
+ ["CD","Congo (RDC)","243","CDF",1],["CI","Côte d'Ivoire","225","XOF",1],["DJ","Djibouti","253","DJF"],["EG","Égypte","20","EGP"],
+ ["ER","Érythrée","291","ERN"],["SZ","Eswatini","268","SZL"],["ET","Éthiopie","251","ETB"],["GA","Gabon","241","XAF",1],
+ ["GM","Gambie","220","GMD"],["GH","Ghana","233","GHS"],["GN","Guinée","224","GNF",1],["GW","Guinée-Bissau","245","XOF",1],
+ ["GQ","Guinée équatoriale","240","XAF",1],["KE","Kenya","254","KES"],["LS","Lesotho","266","LSL"],["LR","Liberia","231","LRD"],
+ ["LY","Libye","218","LYD"],["MG","Madagascar","261","MGA"],["MW","Malawi","265","MWK"],["ML","Mali","223","XOF",1],
+ ["MA","Maroc","212","MAD"],["MU","Maurice","230","MUR"],["MR","Mauritanie","222","MRU"],["MZ","Mozambique","258","MZN"],
+ ["NA","Namibie","264","NAD"],["NE","Niger","227","XOF",1],["NG","Nigeria","234","NGN"],["UG","Ouganda","256","UGX"],
+ ["RW","Rwanda","250","RWF"],["ST","Sao Tomé-et-Principe","239","STN"],["SN","Sénégal","221","XOF",1],["SC","Seychelles","248","SCR"],
+ ["SL","Sierra Leone","232","SLE"],["SO","Somalie","252","SOS"],["SD","Soudan","249","SDG"],["SS","Soudan du Sud","211","SSP"],
+ ["TZ","Tanzanie","255","TZS"],["TD","Tchad","235","XAF",1],["TG","Togo","228","XOF",1],["TN","Tunisie","216","TND"],
+ ["ZM","Zambie","260","ZMW"],["ZW","Zimbabwe","263","ZWG"]
+].sort((a,b)=>a[1].localeCompare(b[1],"fr"));
+const pays=code=>PAYS.find(x=>x[0]===code);
+const optionsPays=sel=>`<option value="">— Choisissez votre pays —</option>`+PAYS.map(([c,n,ind])=>`<option value="${c}"${c===sel?" selected":""}>${esc(n)} (+${ind})</option>`).join("");
+const indicatif=code=>{const x=pays(code);return x?"+"+x[2]:""};
+// Numéro au format international : indicatif du pays + numéro national sans le 0 de tête.
+const numeroIntl=(code,t)=>{const x=pays(code),d=String(t).replace(/\D/g,"");if(!x)return "";
+  const nat=d.startsWith(x[2])&&d.length>x[2].length+7?d.slice(x[2].length):d.replace(/^0+/,"");
+  return nat.length>=6&&nat.length<=12?`+${x[2]} ${nat}`:""};
+const notePays=code=>{const x=pays(code);if(!x)return "";
+  return x[4]?`<div class="hint">✔ ${esc(x[1])} applique le SYSCOHADA révisé. Devise proposée : <b>${x[3]}</b>.</div>`
+    :`<div class="hint">⚠️ ${esc(x[1])} ne fait pas partie de l'OHADA : CompteAssist tient la comptabilité selon le SYSCOHADA, qui n'est pas le référentiel officiel de ce pays. Devise proposée : <b>${x[3]}</b>.</div>`};
 const TRESO=[["571","Caisse"],["521","Banque"],["552","Mobile Money"],["531","Chèques postaux"]];
 const comptes=()=>[...PLAN,...(db.comptes||[]).map(c=>[c.num,c.nom])].sort((a,b)=>a[0].localeCompare(b[0]));
 const nom=c=>(comptes().find(p=>p[0]===c)||[c,"Compte inconnu"])[1];
@@ -193,7 +220,7 @@ function toast(t){const e=$("toast");e.textContent=t;e.classList.add("show");cle
 
 // ---------- Données (localStorage) ----------
 const KEY="compteassist.v1",UIKEY="compteassist.ui";
-const PARAMS0={societe:"Mon entreprise",adresse:"",tel:"",email:"",rccm:"",nif:"",devise:"CDF",tva:16,mentions:"Merci pour votre confiance."};
+const PARAMS0={societe:"Mon entreprise",adresse:"",tel:"",email:"",rccm:"",nif:"",pays:"",devise:"CDF",tva:16,mentions:"Merci pour votre confiance."};
 function normaliser(d){
   d.comptes=Array.isArray(d.comptes)?d.comptes:[];
   d.params=Object.assign({},PARAMS0,d.params||{});
@@ -446,8 +473,8 @@ parametres(){
   const p=db.params;
   const champ=(k,l,ph="")=>`<div><label>${l}</label><input id="p_${k}" value="${esc(p[k])}" placeholder="${ph}"></div>`;
   return `<div class="card"><h2>Mon entreprise</h2><p class="mut" style="margin-top:-6px">Ces informations apparaissent sur vos factures et vos impressions.</p>
-   <div class="f">${champ("societe","Nom de l'entreprise")}${champ("adresse","Adresse","Ex : Av. du Commerce 12, Kinshasa")}${champ("tel","Téléphone","+243…")}${champ("email","E-mail")}${champ("rccm","RCCM")}${champ("nif","N° impôt (NIF)")}
-    <div><label>Devise</label><input id="p_devise" list="devs" value="${esc(p.devise)}"><datalist id="devs"><option value="CDF"><option value="USD"><option value="XOF"><option value="XAF"><option value="EUR"><option value="GNF"><option value="RWF"><option value="BIF"></datalist></div>
+   <div class="f">${champ("societe","Nom de l'entreprise")}${champ("adresse","Adresse","Ex : Av. du Commerce 12, Kinshasa")}<div><label>Pays</label><select id="p_pays" onchange="$('p_pnote').innerHTML=notePays(this.value)">${optionsPays(p.pays)}</select><div id="p_pnote" style="margin-top:6px">${notePays(p.pays)}</div></div>${champ("tel","Téléphone",(indicatif(p.pays)||"+")+"…")}${champ("email","E-mail")}${champ("rccm","RCCM")}${champ("nif","N° impôt (NIF)")}
+    <div><label>Devise</label><input id="p_devise" list="devs" value="${esc(p.devise)}"><datalist id="devs">${[...new Set([...PAYS.map(x=>x[3]),"USD","EUR"])].sort().map(d=>`<option value="${d}">`).join("")}</datalist></div>
     <div><label>TVA par défaut (%)</label><input id="p_tva" type="number" min="0" max="100" step="0.01" value="${esc(p.tva)}"></div>
     <div class="w2"><label>Mention en bas des factures</label><input id="p_mentions" value="${esc(p.mentions)}"></div></div>
    <button class="btn p" onclick="enregistrerParams()">Enregistrer</button></div>
@@ -681,6 +708,7 @@ function supprCompte(n){
 // ---------- Paramètres ----------
 function enregistrerParams(){
   const p=db.params;
+  p.pays=$("p_pays").value;
   ["societe","adresse","tel","email","rccm","nif","devise","mentions"].forEach(k=>p[k]=$("p_"+k).value.trim());
   const t=parseFloat($("p_tva").value);p.tva=isFinite(t)&&t>=0&&t<=100?t:16;
   if(!p.devise)p.devise="CDF";if(!p.societe)p.societe="Mon entreprise";
@@ -769,7 +797,7 @@ const PLANS=[
  {id:"a1",nom:"1 an",prix:120,duree:365*JOUR},
  {id:"a2",nom:"2 ans",prix:200,duree:730*JOUR}
 ];
-const MOYENS=[["mpesa","M-Pesa"],["orange","Orange Money"],["airtel","Airtel Money"],["carte","Carte bancaire"]];
+const MOYENS=[["mpesa","M-Pesa"],["orange","Orange Money"],["airtel","Airtel Money"],["mtn","MTN Mobile Money"],["moov","Moov Money"],["wave","Wave"],["carte","Carte bancaire"]];
 let acces={};
 try{acces=JSON.parse(localStorage.getItem(ACCKEY)||"{}")||{}}catch(e){acces={}}
 const saveAcces=()=>{try{localStorage.setItem(ACCKEY,JSON.stringify(acces))}catch(e){}};
@@ -826,8 +854,8 @@ function formInscription(){
    <div class="f" style="grid-template-columns:1fr">
     <div><label>Nom complet ou nom de l'entreprise</label><input id="i_nom" autocomplete="name"></div>
     <div><label>E-mail</label><input id="i_email" type="email" autocomplete="email"></div>
-    <div><label>Téléphone</label><input id="i_tel" type="tel" placeholder="+243…" autocomplete="tel"></div>
-    <div><label>Pays</label><input id="i_pays" value="RDC"></div>
+    <div><label>Pays</label><select id="i_pays" onchange="choixPaysInscription()">${optionsPays("")}</select><div id="i_pnote" style="margin-top:6px"></div></div>
+    <div><label>Téléphone</label><div style="display:flex;gap:6px"><span id="i_ind" class="btn" style="pointer-events:none;min-width:64px;justify-content:center">+…</span><input id="i_tel" type="tel" inputmode="tel" placeholder="Choisissez d'abord votre pays" autocomplete="tel-national" disabled></div></div>
     <div><label>Mot de passe (6 caractères minimum)</label><input id="i_mdp" type="password" autocomplete="new-password"></div>
     <div><label>Confirmer le mot de passe</label><input id="i_mdp2" type="password" autocomplete="new-password"></div>
    </div>
@@ -852,17 +880,26 @@ function blocTarifs(){
     <button class="btn ${p.pop?"p":""}" style="width:100%;justify-content:center"${bloque?" disabled":""} onclick="choisirPlan('${p.id}')">${bloque?"Déjà utilisé":p.prix===0?"Essayer gratuitement":"Choisir"}</button></div>`}).join("")}</div>
    <p class="mut" style="text-align:center;font-size:13px">Toutes les fonctions sont incluses dans chaque formule. Prix en dollars US.</p>`;
 }
+function choixPaysInscription(){
+  const c=$("i_pays").value,t=$("i_tel");
+  $("i_ind").textContent=indicatif(c)||"+…";$("i_pnote").innerHTML=notePays(c);
+  t.disabled=!c;t.placeholder=c?"Numéro sans l'indicatif":"Choisissez d'abord votre pays";if(c)t.focus();
+}
 async function inscrire(){
   const v=k=>$("i_"+k).value.trim(),out=$("i_res"),err=[];
   if(!v("nom"))err.push("Nom requis.");
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v("email")))err.push("E-mail invalide.");
-  if(v("tel").replace(/\D/g,"").length<8)err.push("Téléphone invalide.");
+  if(!pays(v("pays")))err.push("Choisissez votre pays.");
+  else if(!numeroIntl(v("pays"),v("tel")))err.push("Numéro de téléphone invalide pour ce pays (6 à 12 chiffres, sans l'indicatif).");
   if($("i_mdp").value.length<6)err.push("Mot de passe trop court (6 caractères minimum).");
   if($("i_mdp").value!==$("i_mdp2").value)err.push("Les deux mots de passe ne sont pas identiques.");
   if(acces.compte&&acces.compte.email===v("email").toLowerCase())err.push("Un compte existe déjà avec cet e-mail : connectez-vous.");
   if(err.length){out.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
-  acces.compte={nom:v("nom"),email:v("email").toLowerCase(),tel:v("tel"),pays:v("pays"),mdp:await hacher($("i_mdp").value),cree:Date.now()};
-  acces.connecte=true;saveAcces();toast("Compte créé ✔");
+  acces.compte={nom:v("nom"),email:v("email").toLowerCase(),tel:numeroIntl(v("pays"),v("tel")),pays:pays(v("pays"))[1],paysCode:v("pays"),mdp:await hacher($("i_mdp").value),cree:Date.now()};
+  acces.connecte=true;saveAcces();
+  // Premier dossier : le pays et sa devise deviennent les paramètres de l'entreprise (modifiables ensuite).
+  if(!db.ecritures.length&&!db.params.pays){const x=pays(v("pays"));db.params.pays=x[0];db.params.devise=x[3];if(!db.params.tel)db.params.tel=acces.compte.tel;save()}
+  toast("Compte créé ✔");
   afficherPorte("tarifs");
 }
 async function connecter(){
@@ -894,7 +931,7 @@ function formPaiement(){
    <div class="bar"><button class="btn p" onclick="payer()">${PAIEMENT_REEL?"Payer":"Simuler le paiement"} ${p.prix} $</button><button class="btn" onclick="annulerPaiement()">Retour aux formules</button></div><div id="pres"></div>`;
 }
 const champPaiement=m=>m==="carte"?`<label>Carte bancaire</label><p class="mut" style="margin:0">Vous serez redirigé vers la page sécurisée de paiement par carte.</p>`
-  :`<label>Numéro ${esc((MOYENS.find(x=>x[0]===m)||[])[1]||"")}</label><input id="ptel" type="tel" placeholder="+243…" value="${esc(acces.compte?.tel||"")}"><p class="mut" style="margin:4px 0 0;font-size:13px">Vous recevrez une demande de confirmation sur votre téléphone.</p>`;
+  :`<label>Numéro ${esc((MOYENS.find(x=>x[0]===m)||[])[1]||"")}</label><input id="ptel" type="tel" placeholder="${indicatif(acces.compte?.paysCode||db.params.pays)||"+"}…" value="${esc(acces.compte?.tel||"")}"><p class="mut" style="margin:4px 0 0;font-size:13px">Vous recevrez une demande de confirmation sur votre téléphone.</p>`;
 function annulerPaiement(){payPlan=null;$("gate").innerHTML="";etatAcces();if(!accesLibre())afficherPorte("tarifs");else go("tarifs")}
 function payer(){
   const p=PLANS.find(x=>x.id===payPlan);if(!p)return;
