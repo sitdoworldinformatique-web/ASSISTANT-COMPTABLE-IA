@@ -174,6 +174,33 @@ const PLAN = [
 ["812","Valeur des immobilisations cédées"],["822","Produits des cessions d'immobilisations"],["891","Impôts sur les bénéfices"]
 ];
 const CLASSES={"1":"Capitaux","2":"Immobilisations","3":"Stocks","4":"Tiers","5":"Trésorerie","6":"Charges","7":"Produits","8":"Hors activités ordinaires et impôts"};
+// Pays d'Afrique : [code ISO, nom, indicatif, devise, membre OHADA (SYSCOHADA applicable)]
+const PAYS=[
+ ["ZA","Afrique du Sud","27","ZAR"],["DZ","Algérie","213","DZD"],["AO","Angola","244","AOA"],["BJ","Bénin","229","XOF",1],
+ ["BW","Botswana","267","BWP"],["BF","Burkina Faso","226","XOF",1],["BI","Burundi","257","BIF"],["CM","Cameroun","237","XAF",1],
+ ["CV","Cap-Vert","238","CVE"],["CF","Centrafrique","236","XAF",1],["KM","Comores","269","KMF",1],["CG","Congo (Brazzaville)","242","XAF",1],
+ ["CD","Congo (RDC)","243","CDF",1],["CI","Côte d'Ivoire","225","XOF",1],["DJ","Djibouti","253","DJF"],["EG","Égypte","20","EGP"],
+ ["ER","Érythrée","291","ERN"],["SZ","Eswatini","268","SZL"],["ET","Éthiopie","251","ETB"],["GA","Gabon","241","XAF",1],
+ ["GM","Gambie","220","GMD"],["GH","Ghana","233","GHS"],["GN","Guinée","224","GNF",1],["GW","Guinée-Bissau","245","XOF",1],
+ ["GQ","Guinée équatoriale","240","XAF",1],["KE","Kenya","254","KES"],["LS","Lesotho","266","LSL"],["LR","Liberia","231","LRD"],
+ ["LY","Libye","218","LYD"],["MG","Madagascar","261","MGA"],["MW","Malawi","265","MWK"],["ML","Mali","223","XOF",1],
+ ["MA","Maroc","212","MAD"],["MU","Maurice","230","MUR"],["MR","Mauritanie","222","MRU"],["MZ","Mozambique","258","MZN"],
+ ["NA","Namibie","264","NAD"],["NE","Niger","227","XOF",1],["NG","Nigeria","234","NGN"],["UG","Ouganda","256","UGX"],
+ ["RW","Rwanda","250","RWF"],["ST","Sao Tomé-et-Principe","239","STN"],["SN","Sénégal","221","XOF",1],["SC","Seychelles","248","SCR"],
+ ["SL","Sierra Leone","232","SLE"],["SO","Somalie","252","SOS"],["SD","Soudan","249","SDG"],["SS","Soudan du Sud","211","SSP"],
+ ["TZ","Tanzanie","255","TZS"],["TD","Tchad","235","XAF",1],["TG","Togo","228","XOF",1],["TN","Tunisie","216","TND"],
+ ["ZM","Zambie","260","ZMW"],["ZW","Zimbabwe","263","ZWG"]
+].sort((a,b)=>a[1].localeCompare(b[1],"fr"));
+const pays=code=>PAYS.find(x=>x[0]===code);
+const optionsPays=sel=>`<option value="">— Choisissez votre pays —</option>`+PAYS.map(([c,n,ind])=>`<option value="${c}"${c===sel?" selected":""}>${esc(n)} (+${ind})</option>`).join("");
+const indicatif=code=>{const x=pays(code);return x?"+"+x[2]:""};
+// Numéro au format international : indicatif du pays + numéro national sans le 0 de tête.
+const numeroIntl=(code,t)=>{const x=pays(code),d=String(t).replace(/\D/g,"");if(!x)return "";
+  const nat=d.startsWith(x[2])&&d.length>x[2].length+7?d.slice(x[2].length):d.replace(/^0+/,"");
+  return nat.length>=6&&nat.length<=12?`+${x[2]} ${nat}`:""};
+const notePays=code=>{const x=pays(code);if(!x)return "";
+  return x[4]?`<div class="hint">✔ ${esc(x[1])} applique le SYSCOHADA révisé. Devise proposée : <b>${x[3]}</b>.</div>`
+    :`<div class="hint">⚠️ ${esc(x[1])} ne fait pas partie de l'OHADA : CompteAssist tient la comptabilité selon le SYSCOHADA, qui n'est pas le référentiel officiel de ce pays. Devise proposée : <b>${x[3]}</b>.</div>`};
 const TRESO=[["571","Caisse"],["521","Banque"],["552","Mobile Money"],["531","Chèques postaux"]];
 const comptes=()=>[...PLAN,...(db.comptes||[]).map(c=>[c.num,c.nom])].sort((a,b)=>a[0].localeCompare(b[0]));
 const nom=c=>(comptes().find(p=>p[0]===c)||[c,"Compte inconnu"])[1];
@@ -193,7 +220,7 @@ function toast(t){const e=$("toast");e.textContent=t;e.classList.add("show");cle
 
 // ---------- Données (localStorage) ----------
 const KEY="compteassist.v1",UIKEY="compteassist.ui";
-const PARAMS0={societe:"Mon entreprise",adresse:"",tel:"",email:"",rccm:"",nif:"",devise:"CDF",tva:16,mentions:"Merci pour votre confiance."};
+const PARAMS0={societe:"Mon entreprise",adresse:"",tel:"",email:"",rccm:"",nif:"",pays:"",devise:"CDF",tva:16,mentions:"Merci pour votre confiance."};
 function normaliser(d){
   d.comptes=Array.isArray(d.comptes)?d.comptes:[];
   d.params=Object.assign({},PARAMS0,d.params||{});
@@ -312,7 +339,8 @@ dashboard(){
   const reste=impayees.reduce((a,f)=>a+f.ttc,0);
   const recent=[...db.ecritures].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   const dv=esc(db.params.devise);
-  return `${db.ecritures.length?"":`<div class="card"><h2>Bienvenue 👋</h2><p class="mut">Commencez par renseigner votre entreprise dans <b>Paramètres</b>, puis enregistrez vos dépenses et recettes dans <b>Saisie</b>. Vous pouvez aussi essayer avec des données de démonstration.</p>
+  const negs=TRESO.filter(([c])=>sd(s,c)<=-0.005);
+  return `${negs.length?`<div class="msg bad">⚠️ Solde négatif : ${negs.map(([c,n])=>`<b>${n}</b> ${fmt(sd(s,c))} ${dv}`).join(", ")}. Il manque probablement une recette, un apport ou un virement.</div>`:""}${db.ecritures.length?"":`<div class="card"><h2>Bienvenue 👋</h2><p class="mut">Commencez par renseigner votre entreprise dans <b>Paramètres</b>, puis enregistrez vos dépenses et recettes dans <b>Saisie</b>. Vous pouvez aussi essayer avec des données de démonstration.</p>
    <div class="bar"><button class="btn p" onclick="go('saisie')">➕ Première saisie</button><button class="btn" onclick="demo()">Charger une démo</button><button class="btn" onclick="go('parametres')">⚙️ Paramètres</button></div></div>`}
   <div class="grid">
    <div class="card kpi" style="--c:var(--ok)"><span>Produits (recettes)</span><b>${fmt(r.prod)}</b><em>${dv} · ${libPeriode()}</em></div>
@@ -341,7 +369,7 @@ saisie(){
     <div class="w2"><label>Libellé</label><input id="ql" placeholder="Ex : Loyer octobre, crédit téléphone, vente…" oninput="qAide()"></div>
     <div><label>Montant (${esc(db.params.devise)})</label><input id="qm" type="number" min="0" step="0.01"></div>
     <div><label>Payé / encaissé par</label><select id="qp">${optionsTreso("571")}</select></div>
-    <div class="w2"><label>Compte (choisi automatiquement, modifiable)</label><select id="qc"></select></div>
+    <div class="w2"><label>Compte (choisi automatiquement, modifiable)</label><select id="qc" onchange="this.dataset.manuel='1';qAide()"></select></div>
     <div><label>N° pièce (facultatif)</label><input id="qn" placeholder="Reçu, ticket…"></div>
    </div>
    <div id="qaide"></div>
@@ -445,8 +473,8 @@ parametres(){
   const p=db.params;
   const champ=(k,l,ph="")=>`<div><label>${l}</label><input id="p_${k}" value="${esc(p[k])}" placeholder="${ph}"></div>`;
   return `<div class="card"><h2>Mon entreprise</h2><p class="mut" style="margin-top:-6px">Ces informations apparaissent sur vos factures et vos impressions.</p>
-   <div class="f">${champ("societe","Nom de l'entreprise")}${champ("adresse","Adresse","Ex : Av. du Commerce 12, Kinshasa")}${champ("tel","Téléphone","+243…")}${champ("email","E-mail")}${champ("rccm","RCCM")}${champ("nif","N° impôt (NIF)")}
-    <div><label>Devise</label><input id="p_devise" list="devs" value="${esc(p.devise)}"><datalist id="devs"><option value="CDF"><option value="USD"><option value="XOF"><option value="XAF"><option value="EUR"><option value="GNF"><option value="RWF"><option value="BIF"></datalist></div>
+   <div class="f">${champ("societe","Nom de l'entreprise")}${champ("adresse","Adresse","Ex : Av. du Commerce 12, Kinshasa")}<div><label>Pays</label><select id="p_pays" onchange="$('p_pnote').innerHTML=notePays(this.value)">${optionsPays(p.pays)}</select><div id="p_pnote" style="margin-top:6px">${notePays(p.pays)}</div></div>${champ("tel","Téléphone",(indicatif(p.pays)||"+")+"…")}${champ("email","E-mail")}${champ("rccm","RCCM")}${champ("nif","N° impôt (NIF)")}
+    <div><label>Devise</label><input id="p_devise" list="devs" value="${esc(p.devise)}"><datalist id="devs">${[...new Set([...PAYS.map(x=>x[3]),"USD","EUR"])].sort().map(d=>`<option value="${d}">`).join("")}</datalist></div>
     <div><label>TVA par défaut (%)</label><input id="p_tva" type="number" min="0" max="100" step="0.01" value="${esc(p.tva)}"></div>
     <div class="w2"><label>Mention en bas des factures</label><input id="p_mentions" value="${esc(p.mentions)}"></div></div>
    <button class="btn p" onclick="enregistrerParams()">Enregistrer</button></div>
@@ -490,21 +518,26 @@ const estCharge=c=>(classe(c)==="6")||(classe(c)==="2"&&!c.startsWith("28"));
 function qType(){
   const dep=$("qt").value==="dep";
   $("qc").innerHTML=dep?optionsComptes(estCharge,"605"):optionsComptes(c=>classe(c)==="7","706");
+  $("qc").dataset.manuel="";
   qAide();
 }
 function qAide(){
-  const dep=$("qt").value==="dep",c=suggere($("ql").value);
-  if(c&&(dep?estCharge(c):classe(c)==="7")){$("qc").value=c;$("qaide").innerHTML=`<div class="hint">💡 Compte choisi : <b>${c} ${esc(nom(c))}</b></div>`}
-  else $("qaide").innerHTML="";
+  const dep=$("qt").value==="dep",lib=$("ql").value.trim(),c=suggere(lib),sel=$("qc");
+  // Un compte choisi à la main n'est jamais remplacé ; sinon il suit le libellé (et revient au compte par défaut).
+  if(!sel.dataset.manuel)sel.value=c&&(dep?estCharge(c):classe(c)==="7")?c:dep?"605":"706";
+  const v=sel.value,auto=c===v&&!sel.dataset.manuel;
+  $("qaide").innerHTML=!lib?"":auto?`<div class="hint">💡 Compte choisi : <b>${v} ${esc(nom(v))}</b></div>`
+    :`<div class="hint">${sel.dataset.manuel?"✋ Compte choisi par vous":"❔ Libellé non reconnu, compte par défaut"} : <b>${esc(v)} ${esc(nom(v))}</b>. Vérifiez qu'il convient.</div>`;
 }
 function qValider(){
   const dep=$("qt").value==="dep",date=$("qd").value,lib=$("ql").value.trim(),m=arr(parseFloat($("qm").value)||0),t=$("qp").value,c=$("qc").value;
   const err=[];if(!date)err.push("Date requise.");if(!lib)err.push("Libellé requis.");if(m<=0)err.push("Montant supérieur à 0 requis.");if(!c)err.push("Compte requis.");
   if(err.length){$("qres").innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
   const L=dep?[{compte:c,debit:m,credit:0},{compte:t,debit:0,credit:m}]:[{compte:t,debit:m,credit:0},{compte:c,debit:0,credit:m}];
+  if(!tresoOk(L,date))return;
   db.ecritures.push({id:uid(),date,piece:$("qn").value.trim(),libelle:lib,lignes:L});save();
   toast((dep?"Dépense":"Recette")+" enregistrée ✔");
-  ["ql","qm","qn"].forEach(i=>$(i).value="");$("qaide").innerHTML="";$("qres").innerHTML=`<div class="msg ok">${dep?"Dépense":"Recette"} « ${esc(lib)} » enregistrée ✔ Vous pouvez en saisir une autre.</div>`;$("ql").focus();
+  ["ql","qm","qn"].forEach(i=>$(i).value="");qType();$("qres").innerHTML=`<div class="msg ok">${dep?"Dépense":"Recette"} « ${esc(lib)} » enregistrée ✔ Vous pouvez en saisir une autre.</div>`;$("ql").focus();
 }
 
 // ---------- Saisie avancée ----------
@@ -539,21 +572,63 @@ function valider(){
     if(!l.debit&&!l.credit)err.push(n+"montant manquant.");
   });
   if(Math.abs(d-c)>=0.005)err.push("Débit et crédit doivent être égaux.");
+  const piece=$("pc").value.trim(),e=edition&&db.ecritures.find(x=>x.id===edition),lien=e&&lienFacture(e);
+  if(lien&&!err.length)err.push(...verifFacture(lien,piece,L));
   if(err.length){res.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
-  const piece=$("pc").value.trim(),e=edition&&db.ecritures.find(x=>x.id===edition);
-  if(e){Object.assign(e,{date,piece,libelle:lib,lignes:L});toast("Écriture modifiée ✔")}
+  if(!tresoOk(L,date,e&&e.id))return;
+  if(e){Object.assign(e,{date,piece,libelle:lib,lignes:L});if(lien)majFacture(lien,e);toast("Écriture modifiée ✔")}
   else{db.ecritures.push({id:uid(),date,piece,libelle:lib,lignes:L});toast("Écriture enregistrée ✔")}
   edition=null;save();go("journal");
 }
 function modifier(id){edition=id;go("saisie")}
 function supprimer(id){
   const e=db.ecritures.find(x=>x.id===id);if(!e)return;
-  if(!confirm(`Supprimer l'écriture « ${e.libelle} » du ${dfr(e.date)} ?`))return;
+  const lien=lienFacture(e);
+  if(lien&&lien.type==="facture"&&lien.f.payee){alert(`La facture ${lien.f.num} est déjà encaissée. Supprimez d'abord l'écriture d'encaissement, puis celle de la facture.`);return}
+  if(!confirm(`Supprimer l'écriture « ${e.libelle} » du ${dfr(e.date)} ?${lien?`\nLa facture ${lien.f.num} passera en « ${lien.type==="facture"?"Annulée":"À encaisser"} ».`:""}`))return;
   db.ecritures=db.ecritures.filter(x=>x.id!==id);
-  const f=db.factures.find(x=>x.num===e.piece);
-  if(f&&e.libelle.startsWith("Facture "))f.annulee=true;
-  if(f&&e.libelle.startsWith("Encaissement "))f.payee=null;
+  if(lien&&lien.type==="facture")lien.f.annulee=true;
+  if(lien&&lien.type==="encaissement")lien.f.payee=null;
   save();toast("Écriture supprimée");go("journal");
+}
+// Lien entre une écriture et sa facture (type « facture » ou « encaissement »).
+// Les anciennes écritures n'ont pas le champ « lien » : on le retrouve par le n° de pièce et le libellé.
+function lienFacture(e){
+  const f=db.factures.find(x=>x.num===e.piece);if(!f||f.annulee)return null;
+  const type=e.lien||(e.libelle.startsWith("Facture ")?"facture":e.libelle.startsWith("Encaissement ")?"encaissement":null);
+  return type?{f,type}:null;
+}
+const montant411=(L,k)=>arr(L.filter(l=>l.compte==="411").reduce((a,l)=>a+(l[k]||0),0));
+function verifFacture({f,type},piece,L){
+  const err=[];
+  if(piece!==f.num)err.push(`Cette écriture est liée à la facture ${esc(f.num)} : gardez le n° de pièce ${esc(f.num)}.`);
+  if(type==="facture"){
+    const ttc=montant411(L,"debit"),ht=arr(L.filter(l=>classe(l.compte)==="7").reduce((a,l)=>a+(l.credit||0),0));
+    if(ttc<=0||ht<=0)err.push("L'écriture d'une facture doit garder un débit au compte 411 (client) et un crédit en classe 7 (vente).");
+    else if(f.payee&&Math.abs(ttc-f.ttc)>=0.005)err.push(`La facture ${esc(f.num)} est déjà encaissée pour ${money(f.ttc)} : supprimez d'abord l'encaissement pour changer son montant.`);
+  }else if(Math.abs(montant411(L,"credit")-f.ttc)>=0.005)err.push(`L'encaissement doit créditer le compte 411 du montant de la facture (${money(f.ttc)}).`);
+  return err;
+}
+function majFacture({f,type},e){
+  e.lien=type;
+  if(type==="encaissement"){f.payee=e.date;return}
+  const L=e.lignes,ventes=L.filter(l=>classe(l.compte)==="7");
+  f.date=e.date;
+  f.ttc=montant411(L,"debit");
+  f.ht=arr(ventes.reduce((a,l)=>a+(l.credit||0),0));
+  f.tva=arr(L.filter(l=>l.compte==="4431").reduce((a,l)=>a+(l.credit||0)-(l.debit||0),0));
+  f.taux=f.ht?arr(f.tva/f.ht*100):0;
+  f.compte=ventes[0].compte;
+  if(e.libelle.startsWith("Facture ")&&e.libelle.slice(8).trim())f.client=e.libelle.slice(8).trim();
+}
+// Avertit avant qu'une écriture fasse passer la caisse, la banque ou le Mobile Money en négatif à sa date.
+function tresoOk(L,date,sauf){
+  const s=soldes(db.ecritures.filter(x=>x.id!==sauf&&x.date<=date));
+  const neg=TRESO.filter(([c])=>L.some(l=>l.compte===c&&l.credit>0))
+    .map(([c,n])=>[n,sd(s,c)+L.filter(l=>l.compte===c).reduce((a,l)=>a+(l.debit||0)-(l.credit||0),0)])
+    .filter(x=>x[1]<=-0.005);
+  if(!neg.length)return true;
+  return confirm(neg.map(([n,v])=>`⚠️ ${n} : le solde passerait à ${fmt(v)} ${db.params.devise} au ${dfr(date)}.`).join("\n")+"\n\nIl n'y a pas assez d'argent sur ce compte à cette date. Enregistrer quand même ?");
 }
 
 // ---------- Factures ----------
@@ -574,7 +649,7 @@ function facturer(){
   db.factures.push({num,date,client:cl,objet,taux:t,compte,ht,tva,ttc,payee:null});
   const L=[{compte:"411",debit:ttc,credit:0},{compte,debit:0,credit:ht}];
   if(tva)L.push({compte:"4431",debit:0,credit:tva});
-  db.ecritures.push({id:uid(),date,piece:num,libelle:"Facture "+cl,lignes:L});
+  db.ecritures.push({id:uid(),date,piece:num,libelle:"Facture "+cl,lien:"facture",lignes:L});
   save();go("factures");toast(`Facture ${num} créée ✔`);voirFacture(num);
 }
 function fermer(){$("modal").innerHTML="";document.body.classList.remove("mopen")}
@@ -607,7 +682,7 @@ function encaisser(num){
 }
 function confirmerEncaissement(num){
   const f=db.factures.find(x=>x.num===num),date=$("ed").value,c=$("ec").value;if(!f||!date)return;
-  db.ecritures.push({id:uid(),date,piece:f.num,libelle:"Encaissement "+f.num+" "+f.client,lignes:[{compte:c,debit:f.ttc,credit:0},{compte:"411",debit:0,credit:f.ttc}]});
+  db.ecritures.push({id:uid(),date,piece:f.num,libelle:"Encaissement "+f.num+" "+f.client,lien:"encaissement",lignes:[{compte:c,debit:f.ttc,credit:0},{compte:"411",debit:0,credit:f.ttc}]});
   f.payee=date;save();go("factures");toast("Paiement enregistré ✔");
 }
 
@@ -633,6 +708,7 @@ function supprCompte(n){
 // ---------- Paramètres ----------
 function enregistrerParams(){
   const p=db.params;
+  p.pays=$("p_pays").value;
   ["societe","adresse","tel","email","rccm","nif","devise","mentions"].forEach(k=>p[k]=$("p_"+k).value.trim());
   const t=parseFloat($("p_tva").value);p.tva=isFinite(t)&&t>=0&&t<=100?t:16;
   if(!p.devise)p.devise="CDF";if(!p.societe)p.societe="Mon entreprise";
@@ -721,7 +797,7 @@ const PLANS=[
  {id:"a1",nom:"1 an",prix:120,duree:365*JOUR},
  {id:"a2",nom:"2 ans",prix:200,duree:730*JOUR}
 ];
-const MOYENS=[["mpesa","M-Pesa"],["orange","Orange Money"],["airtel","Airtel Money"],["carte","Carte bancaire"]];
+const MOYENS=[["mpesa","M-Pesa"],["orange","Orange Money"],["airtel","Airtel Money"],["mtn","MTN Mobile Money"],["moov","Moov Money"],["wave","Wave"],["carte","Carte bancaire"]];
 let acces={};
 try{acces=JSON.parse(localStorage.getItem(ACCKEY)||"{}")||{}}catch(e){acces={}}
 const saveAcces=()=>{try{localStorage.setItem(ACCKEY,JSON.stringify(acces))}catch(e){}};
@@ -778,8 +854,8 @@ function formInscription(){
    <div class="f" style="grid-template-columns:1fr">
     <div><label>Nom complet ou nom de l'entreprise</label><input id="i_nom" autocomplete="name"></div>
     <div><label>E-mail</label><input id="i_email" type="email" autocomplete="email"></div>
-    <div><label>Téléphone</label><input id="i_tel" type="tel" placeholder="+243…" autocomplete="tel"></div>
-    <div><label>Pays</label><input id="i_pays" value="RDC"></div>
+    <div><label>Pays</label><select id="i_pays" onchange="choixPaysInscription()">${optionsPays("")}</select><div id="i_pnote" style="margin-top:6px"></div></div>
+    <div><label>Téléphone</label><div style="display:flex;gap:6px"><span id="i_ind" class="btn" style="pointer-events:none;min-width:64px;justify-content:center">+…</span><input id="i_tel" type="tel" inputmode="tel" placeholder="Choisissez d'abord votre pays" autocomplete="tel-national" disabled></div></div>
     <div><label>Mot de passe (6 caractères minimum)</label><input id="i_mdp" type="password" autocomplete="new-password"></div>
     <div><label>Confirmer le mot de passe</label><input id="i_mdp2" type="password" autocomplete="new-password"></div>
    </div>
@@ -804,17 +880,26 @@ function blocTarifs(){
     <button class="btn ${p.pop?"p":""}" style="width:100%;justify-content:center"${bloque?" disabled":""} onclick="choisirPlan('${p.id}')">${bloque?"Déjà utilisé":p.prix===0?"Essayer gratuitement":"Choisir"}</button></div>`}).join("")}</div>
    <p class="mut" style="text-align:center;font-size:13px">Toutes les fonctions sont incluses dans chaque formule. Prix en dollars US.</p>`;
 }
+function choixPaysInscription(){
+  const c=$("i_pays").value,t=$("i_tel");
+  $("i_ind").textContent=indicatif(c)||"+…";$("i_pnote").innerHTML=notePays(c);
+  t.disabled=!c;t.placeholder=c?"Numéro sans l'indicatif":"Choisissez d'abord votre pays";if(c)t.focus();
+}
 async function inscrire(){
   const v=k=>$("i_"+k).value.trim(),out=$("i_res"),err=[];
   if(!v("nom"))err.push("Nom requis.");
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v("email")))err.push("E-mail invalide.");
-  if(v("tel").replace(/\D/g,"").length<8)err.push("Téléphone invalide.");
+  if(!pays(v("pays")))err.push("Choisissez votre pays.");
+  else if(!numeroIntl(v("pays"),v("tel")))err.push("Numéro de téléphone invalide pour ce pays (6 à 12 chiffres, sans l'indicatif).");
   if($("i_mdp").value.length<6)err.push("Mot de passe trop court (6 caractères minimum).");
   if($("i_mdp").value!==$("i_mdp2").value)err.push("Les deux mots de passe ne sont pas identiques.");
   if(acces.compte&&acces.compte.email===v("email").toLowerCase())err.push("Un compte existe déjà avec cet e-mail : connectez-vous.");
   if(err.length){out.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
-  acces.compte={nom:v("nom"),email:v("email").toLowerCase(),tel:v("tel"),pays:v("pays"),mdp:await hacher($("i_mdp").value),cree:Date.now()};
-  acces.connecte=true;saveAcces();toast("Compte créé ✔");
+  acces.compte={nom:v("nom"),email:v("email").toLowerCase(),tel:numeroIntl(v("pays"),v("tel")),pays:pays(v("pays"))[1],paysCode:v("pays"),mdp:await hacher($("i_mdp").value),cree:Date.now()};
+  acces.connecte=true;saveAcces();
+  // Premier dossier : le pays et sa devise deviennent les paramètres de l'entreprise (modifiables ensuite).
+  if(!db.ecritures.length&&!db.params.pays){const x=pays(v("pays"));db.params.pays=x[0];db.params.devise=x[3];if(!db.params.tel)db.params.tel=acces.compte.tel;save()}
+  toast("Compte créé ✔");
   afficherPorte("tarifs");
 }
 async function connecter(){
@@ -846,7 +931,7 @@ function formPaiement(){
    <div class="bar"><button class="btn p" onclick="payer()">${PAIEMENT_REEL?"Payer":"Simuler le paiement"} ${p.prix} $</button><button class="btn" onclick="annulerPaiement()">Retour aux formules</button></div><div id="pres"></div>`;
 }
 const champPaiement=m=>m==="carte"?`<label>Carte bancaire</label><p class="mut" style="margin:0">Vous serez redirigé vers la page sécurisée de paiement par carte.</p>`
-  :`<label>Numéro ${esc((MOYENS.find(x=>x[0]===m)||[])[1]||"")}</label><input id="ptel" type="tel" placeholder="+243…" value="${esc(acces.compte?.tel||"")}"><p class="mut" style="margin:4px 0 0;font-size:13px">Vous recevrez une demande de confirmation sur votre téléphone.</p>`;
+  :`<label>Numéro ${esc((MOYENS.find(x=>x[0]===m)||[])[1]||"")}</label><input id="ptel" type="tel" placeholder="${indicatif(acces.compte?.paysCode||db.params.pays)||"+"}…" value="${esc(acces.compte?.tel||"")}"><p class="mut" style="margin:4px 0 0;font-size:13px">Vous recevrez une demande de confirmation sur votre téléphone.</p>`;
 function annulerPaiement(){payPlan=null;$("gate").innerHTML="";etatAcces();if(!accesLibre())afficherPorte("tarifs");else go("tarifs")}
 function payer(){
   const p=PLANS.find(x=>x.id===payPlan);if(!p)return;
