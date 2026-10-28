@@ -142,6 +142,141 @@ h2{margin:0 0 14px;font-size:16px}.hide{display:none!important}.mut{color:var(--
 <div id="gate" class="gate hide"></div>
 <div id="toast"></div>
 
+<script id="moteur">
+// ---------- Moteur comptable ----------
+// Calculs purs, sans écran ni stockage : testés par tests/moteur.test.js.
+// Les montants restent enregistrés en unités (ex. 1234.5), mais toutes les sommes se font en centimes entiers
+// pour éviter les erreurs d'arrondi des nombres à virgule.
+const Moteur=(()=>{
+  "use strict";
+  // 1.005 * 100 vaut 100.4999… en virgule flottante : le petit décalage corrige ce cas.
+  const enCentimes=n=>{const v=Number(n);if(!isFinite(v))return 0;return Math.sign(v)*Math.round(Math.abs(v)*100+1e-6)};
+  const enUnites=c=>(c||0)/100;
+  const arrondir=n=>enUnites(enCentimes(n));
+  const classe=c=>String(c)[0];
+  const somme=(lignes,k)=>lignes.reduce((a,l)=>a+enCentimes(l[k]||0),0);
+  const equilibree=lignes=>somme(lignes,"debit")===somme(lignes,"credit");
+
+  // Contrôle des lignes d'une écriture ; existe(compte) dit si le compte est dans le plan.
+  function verifierLignes(L,existe){
+    const err=[];
+    if(L.length<2)err.push("Au moins deux lignes.");
+    L.forEach((l,i)=>{
+      const n="Ligne "+(i+1)+" : ";
+      if(!l.compte)err.push(n+"compte manquant.");
+      else if(existe&&!existe(l.compte))err.push(n+"compte "+l.compte+" absent du plan (vous pouvez l'ajouter dans « Plan comptable »).");
+      if(l.debit<0||l.credit<0)err.push(n+"pas de montant négatif.");
+      if(l.debit&&l.credit)err.push(n+"mettez soit un débit, soit un crédit, pas les deux.");
+      if(!l.debit&&!l.credit)err.push(n+"montant manquant.");
+    });
+    if(!equilibree(L))err.push("Débit et crédit doivent être égaux.");
+    return err;
+  }
+
+  // Totaux débit / crédit par compte, recalculés à partir des seules écritures.
+  function soldes(ecritures){
+    const cts={};
+    ecritures.forEach(e=>e.lignes.forEach(l=>{
+      const s=cts[l.compte]=cts[l.compte]||{d:0,c:0};
+      s.d+=enCentimes(l.debit||0);s.c+=enCentimes(l.credit||0);
+    }));
+    const s={};
+    Object.keys(cts).forEach(c=>s[c]={d:enUnites(cts[c].d),c:enUnites(cts[c].c)});
+    return s;
+  }
+  const sd=(s,c)=>arrondir((s[c]?.d||0)-(s[c]?.c||0));
+
+  function resultat(ecritures){
+    let prod=0,ch=0,hao=0;
+    ecritures.forEach(e=>e.lignes.forEach(l=>{
+      const k=classe(l.compte),net=enCentimes(l.credit||0)-enCentimes(l.debit||0);
+      if(k==="7")prod+=net;
+      if(k==="6")ch-=net;
+      if(k==="8")hao+=net;
+    }));
+    return {prod:enUnites(prod),ch:enUnites(ch),hao:enUnites(hao),res:enUnites(prod-ch+hao)};
+  }
+
+  // Bilan simplifié : chaque compte de classe 1 à 5 va à l'actif ou au passif selon son solde.
+  function bilan(ecritures){
+    const s=soldes(ecritures),actif=[],passif=[];
+    Object.keys(s).sort().forEach(c=>{
+      const k=classe(c),v=enCentimes(sd(s,c));
+      if("678".includes(k)||v===0)return;
+      if(k==="1")passif.push([c,-v]);                  // capitaux, emprunts
+      else if(k==="2"||k==="3")actif.push([c,v]);      // immobilisations (amortissements en moins), stocks
+      else if(v>0)actif.push([c,v]);                   // créances, trésorerie positive
+      else passif.push([c,-v]);                        // dettes, découvert
+    });
+    const r=enCentimes(resultat(ecritures).res);
+    const ta=actif.reduce((a,x)=>a+x[1],0),tp=passif.reduce((a,x)=>a+x[1],0)+r;
+    const u=L=>L.map(([c,v])=>[c,enUnites(v)]);
+    return {actif:u(actif),passif:u(passif),r:enUnites(r),ta:enUnites(ta),tp:enUnites(tp),equilibre:ta===tp};
+  }
+
+  function balance(ecritures){
+    const s=soldes(ecritures);let td=0,tc=0;
+    const lignes=Object.keys(s).sort().map(c=>{td+=enCentimes(s[c].d);tc+=enCentimes(s[c].c);return {compte:c,d:s[c].d,c:s[c].c,solde:sd(s,c)}});
+    return {lignes,td:enUnites(td),tc:enUnites(tc),equilibre:td===tc};
+  }
+
+  // Grand livre d'un compte : solde d'ouverture (écritures avant « du »), mouvements de la période, solde courant.
+  function grandLivre(ecritures,compte,du,au){
+    let ouv=0,solde=0,td=0,tc=0;const mouvements=[];
+    [...ecritures].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>e.lignes.forEach(l=>{
+      if(l.compte!==compte)return;
+      const d=enCentimes(l.debit||0),c=enCentimes(l.credit||0);
+      if(du&&e.date<du){ouv+=d-c;return}
+      if(au&&e.date>au)return;
+      if(!mouvements.length)solde=ouv;
+      solde+=d-c;td+=d;tc+=c;
+      mouvements.push({e,l,solde:enUnites(solde)});
+    }));
+    if(!mouvements.length)solde=ouv;
+    return {ouverture:enUnites(ouv),mouvements,td:enUnites(td),tc:enUnites(tc),cloture:enUnites(solde)};
+  }
+
+  // Facture de vente sur une ligne : TVA et TTC arrondis au centime.
+  function calculFacture(ht,taux){
+    const h=enCentimes(ht),tva=Math.round(h*(Number(taux)||0)/100);
+    return {ht:enUnites(h),tva:enUnites(tva),ttc:enUnites(h+tva)};
+  }
+  function lignesFacture({ht,tva,ttc,compte}){
+    const L=[{compte:"411",debit:ttc,credit:0},{compte,debit:0,credit:ht}];
+    if(enCentimes(tva))L.push({compte:"4431",debit:0,credit:tva});
+    return L;
+  }
+
+  // Contrôle d'une sauvegarde avant restauration : structure, dates, comptes, montants, équilibre.
+  // Les identifiants et numéros sont insérés dans la page : ils doivent rester de simples codes.
+  const CODE=/^[A-Za-z0-9_-]{1,40}$/,DATE=/^\d{4}-\d{2}-\d{2}$/,COMPTE=/^[1-9]\d{1,7}$/;
+  const montantOk=v=>v===undefined||v===null||(typeof v==="number"&&isFinite(v)&&v>=0);
+  function controleSauvegarde(d){
+    const err=[];
+    if(!d||typeof d!=="object"||!Array.isArray(d.ecritures)||!Array.isArray(d.factures))return ["Ce fichier n'est pas une sauvegarde CompteAssist."];
+    d.ecritures.forEach((e,i)=>{
+      const n=`Écriture ${i+1} : `;
+      if(!e||typeof e!=="object"){err.push(n+"illisible.");return}
+      if(e.id!==undefined&&!CODE.test(String(e.id)))err.push(n+"identifiant invalide.");
+      if(!DATE.test(String(e.date)))err.push(n+"date invalide.");
+      if(!Array.isArray(e.lignes)||e.lignes.length<2){err.push(n+"au moins deux lignes requises.");return}
+      if(e.lignes.some(l=>!l||!COMPTE.test(String(l.compte))))err.push(n+"numéro de compte invalide.");
+      if(e.lignes.some(l=>l&&(!montantOk(l.debit)||!montantOk(l.credit))))err.push(n+"montant invalide.");
+      else if(!equilibree(e.lignes))err.push(n+"débit et crédit ne sont pas égaux.");
+    });
+    d.factures.forEach((f,i)=>{
+      const n=`Facture ${i+1} : `;
+      if(!f||!CODE.test(String(f.num)))err.push(n+"numéro invalide.");
+      else if(!["ht","tva","ttc"].every(k=>montantOk(f[k])))err.push(n+"montant invalide.");
+    });
+    if(d.comptes!==undefined&&(!Array.isArray(d.comptes)||d.comptes.some(c=>!c||!COMPTE.test(String(c.num)))))err.push("Plan comptable : numéro de compte invalide.");
+    return err;
+  }
+
+  return {enCentimes,enUnites,arrondir,somme,equilibree,verifierLignes,soldes,sd,resultat,bilan,balance,grandLivre,calculFacture,lignesFacture,controleSauvegarde};
+})();
+if(typeof module==="object"&&module.exports)module.exports=Moteur;
+</script>
 <script>
 // ---------- Plan comptable SYSCOHADA révisé (extrait élargi) ----------
 const PLAN = [
@@ -209,7 +344,7 @@ const classe=c=>String(c)[0];
 
 // ---------- Outils ----------
 const esc=s=>String(s??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
-const arr=n=>Math.round((n+Number.EPSILON)*100)/100;
+const arr=Moteur.arrondir;
 const fmt=n=>{const v=arr(n);return (v===0?0:v).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})};
 const money=n=>fmt(n)+" "+esc(db.params.devise);
 const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
@@ -280,42 +415,12 @@ const REGLES=[
 ];
 const suggere=l=>{for(const [re,c] of REGLES)if(re.test(l))return c;return null};
 
-// ---------- Calculs ----------
-function soldes(list=ecrP()){
-  const s={};
-  list.forEach(e=>e.lignes.forEach(l=>{
-    s[l.compte]=s[l.compte]||{d:0,c:0};
-    s[l.compte].d+=l.debit||0;s[l.compte].c+=l.credit||0;
-  }));
-  return s;
-}
-const sd=(s,c)=>(s[c]?.d||0)-(s[c]?.c||0);
-function resultat(list=ecrP()){
-  const s=soldes(list);let prod=0,ch=0,hao=0;
-  Object.entries(s).forEach(([c,v])=>{
-    const k=classe(c);
-    if(k==="7")prod+=v.c-v.d;
-    if(k==="6")ch+=v.d-v.c;
-    if(k==="8")hao+=v.c-v.d;
-  });
-  return {prod,ch,hao,res:prod-ch+hao};
-}
-function bilan(){
-  const list=ecrJusquAu(),s=soldes(list),actif=[],passif=[];
-  Object.keys(s).sort().forEach(c=>{
-    const k=classe(c),v=sd(s,c);
-    if("678".includes(k)||Math.abs(v)<0.005)return;
-    if(k==="1")passif.push([c,-v]);                  // capitaux, emprunts
-    else if(k==="2"||k==="3")actif.push([c,v]);      // immobilisations (amortissements en moins), stocks
-    else if(v>0)actif.push([c,v]);                   // créances, trésorerie positive
-    else passif.push([c,-v]);                        // dettes, découvert
-  });
-  const r=resultat(list).res;
-  const ta=actif.reduce((a,x)=>a+x[1],0),tp=passif.reduce((a,x)=>a+x[1],0)+r;
-  return {actif,passif,r,ta,tp};
-}
+// ---------- Calculs (moteur comptable) ----------
+const soldes=(list=ecrP())=>Moteur.soldes(list);
+const sd=Moteur.sd;
+const resultat=(list=ecrP())=>Moteur.resultat(list);
+const bilan=()=>Moteur.bilan(ecrJusquAu());
 const factStatut=f=>f.annulee?["Annulée",""]:f.payee?["Payée","ok"]:["À encaisser","bad"];
-const soldeAvant=c=>db.ecritures.filter(e=>ui.du&&e.date<ui.du).reduce((a,e)=>a+e.lignes.filter(l=>l.compte===c).reduce((x,l)=>x+(l.debit||0)-(l.credit||0),0),0);
 const sens=v=>v>=0.005?"D":v<=-0.005?"C":"";
 
 // ---------- Petits composants ----------
@@ -387,8 +492,8 @@ saisie(){
 },
 journal(){
   const list=[...ecrP()].sort((a,b)=>a.date.localeCompare(b.date));
-  let td=0,tc=0;
-  const rows=list.map(e=>e.lignes.map((l,i)=>{td+=l.debit||0;tc+=l.credit||0;return `<tr><td>${i?"":dfr(e.date)}</td><td>${i?"":esc(e.piece)}</td><td>${i?"":esc(e.libelle)}</td><td>${esc(l.compte)} <span class="mut">${esc(nom(l.compte))}</span></td><td class="n">${l.debit?fmt(l.debit):""}</td><td class="n">${l.credit?fmt(l.credit):""}</td><td class="noprint" style="white-space:nowrap">${i?"":`<button class="btn x" title="Modifier" onclick="modifier('${e.id}')">✏️</button><button class="btn x" title="Supprimer" onclick="supprimer('${e.id}')">🗑</button>`}</td></tr>`}).join("")).join("");
+  const lignes=list.flatMap(e=>e.lignes),td=Moteur.enUnites(Moteur.somme(lignes,"debit")),tc=Moteur.enUnites(Moteur.somme(lignes,"credit"));
+  const rows=list.map(e=>e.lignes.map((l,i)=>{return `<tr><td>${i?"":dfr(e.date)}</td><td>${i?"":esc(e.piece)}</td><td>${i?"":esc(e.libelle)}</td><td>${esc(l.compte)} <span class="mut">${esc(nom(l.compte))}</span></td><td class="n">${l.debit?fmt(l.debit):""}</td><td class="n">${l.credit?fmt(l.credit):""}</td><td class="noprint" style="white-space:nowrap">${i?"":`<button class="btn x" title="Modifier" onclick="modifier('${e.id}')">✏️</button><button class="btn x" title="Supprimer" onclick="supprimer('${e.id}')">🗑</button>`}</td></tr>`}).join("")).join("");
   return `<div class="card">${printhead("Journal")}<div class="head"><h2>Journal <span class="tag">${list.length} écriture(s)</span></h2>
    <button class="btn sm" onclick="exportJournal()">⬇ Excel (CSV)</button><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div>
    ${tableau(`<th>Date</th><th>Pièce</th><th>Libellé</th><th>Compte</th><th class="n">Débit</th><th class="n">Crédit</th><th class="noprint"></th>`,
@@ -398,9 +503,8 @@ grandlivre(){
   const utilises=[...new Set(db.ecritures.flatMap(e=>e.lignes.map(l=>l.compte)))].sort();
   if(!utilises.length)return `<div class="card"><h2>Grand livre</h2><p class="mut">Aucune écriture pour le moment.</p></div>`;
   if(!utilises.includes(ui.gl))ui.gl=utilises[0];
-  const c=ui.gl,ouverture=soldeAvant(c);let solde=ouverture,td=0,tc=0;
-  const mv=[...ecrP()].sort((a,b)=>a.date.localeCompare(b.date)).flatMap(e=>e.lignes.filter(l=>l.compte===c).map(l=>({e,l})));
-  const rows=mv.map(({e,l})=>{solde+=(l.debit||0)-(l.credit||0);td+=l.debit||0;tc+=l.credit||0;
+  const c=ui.gl,g=Moteur.grandLivre(db.ecritures,c,ui.du,ui.au),ouverture=g.ouverture,solde=g.cloture,td=g.td,tc=g.tc;
+  const rows=g.mouvements.map(({e,l,solde})=>{
    return `<tr><td>${dfr(e.date)}</td><td>${esc(e.piece)}</td><td>${esc(e.libelle)}</td><td class="n">${l.debit?fmt(l.debit):""}</td><td class="n">${l.credit?fmt(l.credit):""}</td><td class="n">${fmt(Math.abs(solde))} ${sens(solde)}</td></tr>`}).join("");
   return `<div class="card">${printhead("Grand livre "+esc(c+" "+nom(c)))}<div class="head"><h2>Grand livre</h2>
    <select style="width:auto;max-width:100%" class="noprint" onchange="ui.gl=this.value;saveUi();go('grandlivre')">${utilises.map(x=>`<option value="${esc(x)}"${x===c?" selected":""}>${esc(x)} – ${esc(nom(x))}</option>`).join("")}</select>
@@ -410,10 +514,10 @@ grandlivre(){
     `<tr class="tot"><th colspan=3>Totaux de la période</th><th class="n">${fmt(td)}</th><th class="n">${fmt(tc)}</th><th class="n">${fmt(Math.abs(solde))} ${sens(solde)}</th></tr>`,"")}</div>`;
 },
 balance(){
-  const s=soldes();let td=0,tc=0;
-  const rows=Object.keys(s).sort().map(c=>{const v=s[c];td+=v.d;tc+=v.c;const x=v.d-v.c;
+  const b=Moteur.balance(ecrP()),td=b.td,tc=b.tc;
+  const rows=b.lignes.map(({compte:c,d,c:cr,solde:x})=>{const v={d,c:cr};
    return `<tr><td><a href="#" onclick="ui.gl=this.textContent;go('grandlivre');return false" title="Voir le grand livre">${esc(c)}</a></td><td>${esc(nom(c))}</td><td class="n">${fmt(v.d)}</td><td class="n">${fmt(v.c)}</td><td class="n">${x>=0.005?fmt(x):""}</td><td class="n">${x<=-0.005?fmt(-x):""}</td></tr>`}).join("");
-  const eq=Math.abs(td-tc)<0.005;
+  const eq=b.equilibre;
   return `<div class="card">${printhead("Balance générale")}<div class="head"><h2>Balance générale</h2>
    <button class="btn sm" onclick="exportBalance()">⬇ Excel (CSV)</button><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div>
    ${tableau(`<th>Compte</th><th>Intitulé</th><th class="n">Débit</th><th class="n">Crédit</th><th class="n">Solde D</th><th class="n">Solde C</th>`,
@@ -435,7 +539,7 @@ etats(){
 bilan(){
   const b=bilan(),dt=dfr(ui.au)||dfr(today());
   const lig=L=>L.map(([c,v])=>`<tr><td>${esc(c)} ${esc(nom(c))}</td><td class="n">${fmt(v)}</td></tr>`).join("");
-  const eq=Math.abs(b.ta-b.tp)<0.005;
+  const eq=b.equilibre;
   return `<div class="card">${printhead("Bilan au "+dt)}<div class="head"><h2>Bilan simplifié au ${dt}</h2><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div><div class="cols">
    <div class="tw"><table><tr><th colspan=2>Actif (ce que l'entreprise possède)</th></tr>${lig(b.actif)||'<tr><td colspan=2 class="mut">—</td></tr>'}
     <tr class="tot"><th>Total actif</th><th class="n">${fmt(b.ta)}</th></tr></table></div>
@@ -548,8 +652,8 @@ function addLigne(c="",d="",k=""){
   $("lignes").appendChild(el);
 }
 function lire(){return [...document.querySelectorAll("#lignes .row")].map(r=>{const i=r.querySelectorAll("input");return{compte:i[0].value.trim(),debit:arr(parseFloat(i[1].value)||0),credit:arr(parseFloat(i[2].value)||0)}}).filter(l=>l.compte||l.debit||l.credit)}
-function tot(){const L=lire();const d=L.reduce((a,l)=>a+l.debit,0),c=L.reduce((a,l)=>a+l.credit,0);
-  $("tot").innerHTML=`Débit <b>${fmt(d)}</b> · Crédit <b>${fmt(c)}</b> · Écart <b style="color:${Math.abs(d-c)<0.005?'var(--ok)':'var(--bad)'}">${fmt(d-c)}</b>`}
+function tot(){const L=lire(),d=Moteur.somme(L,"debit"),c=Moteur.somme(L,"credit"),u=Moteur.enUnites;
+  $("tot").innerHTML=`Débit <b>${fmt(u(d))}</b> · Crédit <b>${fmt(u(c))}</b> · Écart <b style="color:${d===c?'var(--ok)':'var(--bad)'}">${fmt(u(d-c))}</b>`}
 function aide(){
   const c=suggere($("lib").value);
   $("aide").innerHTML=c?`<div class="hint">💡 Compte suggéré : <b>${c} ${esc(nom(c))}</b> <button class="btn sm" onclick="appliquer('${c}')">Utiliser</button></div>`:"";
@@ -557,21 +661,11 @@ function aide(){
 function appliquer(c){const L=document.querySelector("#lignes .row input");if(L&&!L.value){L.value=c;}else addLigne(c);tot()}
 function valider(){
   const L=lire(),res=$("res");
-  const d=L.reduce((a,l)=>a+l.debit,0),c=L.reduce((a,l)=>a+l.credit,0);
   const date=$("dt").value,lib=$("lib").value.trim();
   const err=[];
   if(!date)err.push("Date requise.");
   if(!lib)err.push("Libellé requis.");
-  if(L.length<2)err.push("Au moins deux lignes.");
-  L.forEach((l,i)=>{
-    const n="Ligne "+(i+1)+" : ";
-    if(!l.compte)err.push(n+"compte manquant.");
-    else if(!existe(l.compte))err.push(n+"compte "+esc(l.compte)+" absent du plan (vous pouvez l'ajouter dans « Plan comptable »).");
-    if(l.debit<0||l.credit<0)err.push(n+"pas de montant négatif.");
-    if(l.debit&&l.credit)err.push(n+"mettez soit un débit, soit un crédit, pas les deux.");
-    if(!l.debit&&!l.credit)err.push(n+"montant manquant.");
-  });
-  if(Math.abs(d-c)>=0.005)err.push("Débit et crédit doivent être égaux.");
+  err.push(...Moteur.verifierLignes(L,existe).map(esc));
   const piece=$("pc").value.trim(),e=edition&&db.ecritures.find(x=>x.id===edition),lien=e&&lienFacture(e);
   if(lien&&!err.length)err.push(...verifFacture(lien,piece,L));
   if(err.length){res.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
@@ -598,12 +692,12 @@ function lienFacture(e){
   const type=e.lien||(e.libelle.startsWith("Facture ")?"facture":e.libelle.startsWith("Encaissement ")?"encaissement":null);
   return type?{f,type}:null;
 }
-const montant411=(L,k)=>arr(L.filter(l=>l.compte==="411").reduce((a,l)=>a+(l[k]||0),0));
+const montant411=(L,k)=>Moteur.enUnites(Moteur.somme(L.filter(l=>l.compte==="411"),k));
 function verifFacture({f,type},piece,L){
   const err=[];
   if(piece!==f.num)err.push(`Cette écriture est liée à la facture ${esc(f.num)} : gardez le n° de pièce ${esc(f.num)}.`);
   if(type==="facture"){
-    const ttc=montant411(L,"debit"),ht=arr(L.filter(l=>classe(l.compte)==="7").reduce((a,l)=>a+(l.credit||0),0));
+    const ttc=montant411(L,"debit"),ht=Moteur.enUnites(Moteur.somme(L.filter(l=>classe(l.compte)==="7"),"credit"));
     if(ttc<=0||ht<=0)err.push("L'écriture d'une facture doit garder un débit au compte 411 (client) et un crédit en classe 7 (vente).");
     else if(f.payee&&Math.abs(ttc-f.ttc)>=0.005)err.push(`La facture ${esc(f.num)} est déjà encaissée pour ${money(f.ttc)} : supprimez d'abord l'encaissement pour changer son montant.`);
   }else if(Math.abs(montant411(L,"credit")-f.ttc)>=0.005)err.push(`L'encaissement doit créditer le compte 411 du montant de la facture (${money(f.ttc)}).`);
@@ -615,8 +709,9 @@ function majFacture({f,type},e){
   const L=e.lignes,ventes=L.filter(l=>classe(l.compte)==="7");
   f.date=e.date;
   f.ttc=montant411(L,"debit");
-  f.ht=arr(ventes.reduce((a,l)=>a+(l.credit||0),0));
-  f.tva=arr(L.filter(l=>l.compte==="4431").reduce((a,l)=>a+(l.credit||0)-(l.debit||0),0));
+  const tva=L.filter(l=>l.compte==="4431");
+  f.ht=Moteur.enUnites(Moteur.somme(ventes,"credit"));
+  f.tva=Moteur.enUnites(Moteur.somme(tva,"credit")-Moteur.somme(tva,"debit"));
   f.taux=f.ht?arr(f.tva/f.ht*100):0;
   f.compte=ventes[0].compte;
   if(e.libelle.startsWith("Facture ")&&e.libelle.slice(8).trim())f.client=e.libelle.slice(8).trim();
@@ -625,7 +720,7 @@ function majFacture({f,type},e){
 function tresoOk(L,date,sauf){
   const s=soldes(db.ecritures.filter(x=>x.id!==sauf&&x.date<=date));
   const neg=TRESO.filter(([c])=>L.some(l=>l.compte===c&&l.credit>0))
-    .map(([c,n])=>[n,sd(s,c)+L.filter(l=>l.compte===c).reduce((a,l)=>a+(l.debit||0)-(l.credit||0),0)])
+    .map(([c,n])=>{const M=L.filter(l=>l.compte===c);return [n,arr(sd(s,c)+Moteur.enUnites(Moteur.somme(M,"debit")-Moteur.somme(M,"credit")))]})
     .filter(x=>x[1]<=-0.005);
   if(!neg.length)return true;
   return confirm(neg.map(([n,v])=>`⚠️ ${n} : le solde passerait à ${fmt(v)} ${db.params.devise} au ${dfr(date)}.`).join("\n")+"\n\nIl n'y a pas assez d'argent sur ce compte à cette date. Enregistrer quand même ?");
@@ -637,18 +732,17 @@ function prochainNum(){
   return "F"+String(max+1).padStart(4,"0");
 }
 function apercuFacture(){
-  const ht=arr(parseFloat($("fh").value)||0),t=parseFloat($("ft").value)||0,tva=arr(ht*t/100);
-  $("fap").innerHTML=`Prochain numéro : <b>${prochainNum()}</b>${ht?` · TVA ${fmt(tva)} · <b>Total TTC ${money(ht+tva)}</b>`:""}`;
+  const {ht,tva,ttc}=Moteur.calculFacture(parseFloat($("fh").value)||0,parseFloat($("ft").value)||0);
+  $("fap").innerHTML=`Prochain numéro : <b>${prochainNum()}</b>${ht?` · TVA ${fmt(tva)} · <b>Total TTC ${money(ttc)}</b>`:""}`;
 }
 function facturer(){
   const ht=arr(parseFloat($("fh").value)||0),t=parseFloat($("ft").value)||0,cl=$("fc").value.trim(),date=$("fd").value,objet=$("fo").value.trim(),compte=$("fk").value;
   const out=$("fres");
   if(!cl||ht<=0||!date){out.innerHTML=`<div class="msg bad">Date, client et montant HT (supérieur à 0) requis.</div>`;return}
   if(t<0||t>100){out.innerHTML=`<div class="msg bad">Le taux de TVA doit être entre 0 et 100 %.</div>`;return}
-  const tva=arr(ht*t/100),ttc=arr(ht+tva),num=prochainNum();
+  const {tva,ttc}=Moteur.calculFacture(ht,t),num=prochainNum();
   db.factures.push({num,date,client:cl,objet,taux:t,compte,ht,tva,ttc,payee:null});
-  const L=[{compte:"411",debit:ttc,credit:0},{compte,debit:0,credit:ht}];
-  if(tva)L.push({compte:"4431",debit:0,credit:tva});
+  const L=Moteur.lignesFacture({ht,tva,ttc,compte});
   db.ecritures.push({id:uid(),date,piece:num,libelle:"Facture "+cl,lien:"facture",lignes:L});
   save();go("factures");toast(`Facture ${num} créée ✔`);voirFacture(num);
 }
@@ -751,14 +845,15 @@ function exportJournal(){
   csvDl("journal",L);
 }
 function exportBalance(){
-  const s=soldes(),L=[["Compte","Intitulé","Débit","Crédit","Solde débiteur","Solde créditeur"]];
-  Object.keys(s).sort().forEach(c=>{const v=s[c],x=v.d-v.c;L.push([c,nom(c),num(v.d),num(v.c),x>=0.005?num(x):"",x<=-0.005?num(-x):""])});
+  const L=[["Compte","Intitulé","Débit","Crédit","Solde débiteur","Solde créditeur"]];
+  Moteur.balance(ecrP()).lignes.forEach(({compte:c,d,c:cr,solde:x})=>L.push([c,nom(c),num(d),num(cr),x>0?num(x):"",x<0?num(-x):""]));
   csvDl("balance",L);
 }
 function exportGL(){
   const c=ui.gl,L=[["Compte",c+" "+nom(c)],["Date","Pièce","Libellé","Débit","Crédit","Solde"]];
-  let s=soldeAvant(c);if(ui.du)L.push([dfr(ui.du),"","Solde reporté","","",arr(s).toFixed(2).replace(".",",")]);
-  [...ecrP()].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>e.lignes.filter(l=>l.compte===c).forEach(l=>{s+=(l.debit||0)-(l.credit||0);L.push([dfr(e.date),e.piece,e.libelle,num(l.debit),num(l.credit),arr(s).toFixed(2).replace(".",",")])}));
+  const g=Moteur.grandLivre(db.ecritures,c,ui.du,ui.au),sol=v=>v.toFixed(2).replace(".",",");
+  if(ui.du)L.push([dfr(ui.du),"","Solde reporté","","",sol(g.ouverture)]);
+  g.mouvements.forEach(({e,l,solde})=>L.push([dfr(e.date),e.piece,e.libelle,num(l.debit),num(l.credit),sol(solde)]));
   csvDl("grand-livre-"+c,L);
 }
 function exportFactures(){
@@ -773,7 +868,8 @@ function restaurer(input){
   r.onload=()=>{
     try{
       const d=JSON.parse(r.result);
-      if(!d||!Array.isArray(d.ecritures)||!Array.isArray(d.factures))throw 0;
+      const err=Moteur.controleSauvegarde(d);
+      if(err.length){$("sres").innerHTML=`<div class="msg bad">Sauvegarde refusée, rien n'a été modifié :<br>${err.slice(0,8).map(esc).join("<br>")}${err.length>8?`<br>… et ${err.length-8} autre(s) problème(s).`:""}</div>`;return}
       if(!confirm(`Remplacer les données actuelles par cette sauvegarde (${d.ecritures.length} écriture(s), ${d.factures.length} facture(s)) ?`))return;
       db=normaliser(d);save();go("dashboard");toast("Sauvegarde restaurée ✔");
     }catch(e){$("sres").innerHTML=`<div class="msg bad">Ce fichier n'est pas une sauvegarde CompteAssist valide.</div>`}
