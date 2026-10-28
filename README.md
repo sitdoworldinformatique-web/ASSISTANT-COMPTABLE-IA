@@ -15,3 +15,9 @@ npm test
 ```
 
 (Node.js 20 ou plus récent, aucune dépendance à installer.) Ils tournent aussi sur GitHub à chaque PR.
+
+## Comptes et données en ligne (Supabase)
+
+Facultatif : sans réglage, tout reste dans le navigateur. Pour de vrais comptes, des données partagées
+entre appareils et l'isolation entre entreprises, suivez [supabase/LISEZMOI.md](supabase/LISEZMOI.md).
+Le schéma de la base est dans `supabase/schema.sql`, ses tests dans `tests/sql/` (`npm run test:base`).

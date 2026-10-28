@@ -476,10 +476,183 @@ function charger(){
   return normaliser(d);
 }
 let db=charger();
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert("Impossible d'enregistrer dans ce navigateur. Faites une sauvegarde depuis Paramètres.")}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert("Impossible d'enregistrer dans ce navigateur. Faites une sauvegarde depuis Paramètres.")}Nuage.planifier()};
 let ui={vue:"dashboard",du:"",au:"",theme:"",gl:"",mode:"simple",q:"",jq:""};
 try{Object.assign(ui,JSON.parse(localStorage.getItem(UIKEY)||"{}"))}catch(e){}
 const saveUi=()=>{try{localStorage.setItem(UIKEY,JSON.stringify(ui))}catch(e){}};
+
+// ---------- Comptes et données en ligne (Supabase) ----------
+// Laissez url et cle vides pour tout garder dans ce navigateur, comme avant.
+// La clé à mettre ici est la clé publique « anon » (Supabase > Project Settings > API), jamais la clé service_role.
+// Base à créer avec supabase/schema.sql (voir supabase/LISEZMOI.md).
+const SUPABASE={url:"",cle:""};
+const Nuage=(()=>{
+  const SKEY="compteassist.session",MKEY="compteassist.miroir";
+  const lire=k=>{try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e){return null}};
+  const ecrire=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+  let session=lire(SKEY),miroir=lire(MKEY),etat={code:"",texte:""},minuterie=null,enCours=null,encore=false;
+  const actif=()=>!!(SUPABASE.url&&SUPABASE.cle);
+  const connecte=()=>actif()&&!!session&&!!(acces.entreprise);
+  const garderSession=s=>{if(s&&!s.expires_at)s.expires_at=Math.floor(Date.now()/1000)+(s.expires_in||3600);session=s;ecrire(SKEY,s)};
+  const garderMiroir=()=>ecrire(MKEY,miroir);
+  function signaler(code,texte){etat={code,texte};const el=$("nuage");if(el)el.innerHTML=texteEtat()}
+  const texteEtat=()=>!connecte()?"":`<small style="display:block;margin-top:4px;text-transform:none;letter-spacing:0;color:${etat.code==="erreur"?"#fca5a5":"var(--sideink)"}">${etat.code==="ok"?"☁ Données enregistrées en ligne":etat.code==="envoi"?"☁ Enregistrement en ligne…":etat.code==="attente"?"☁ Hors ligne : "+esc(etat.texte):etat.code==="erreur"?"⚠ "+esc(etat.texte):"☁ En ligne"}</small>`;
+
+  // Traduit les messages d'erreur courants de Supabase.
+  function message(d,statut){
+    const m=(d&&(d.message||d.msg||d.error_description||d.error))||"";
+    if(/Invalid login credentials/i.test(m))return "E-mail ou mot de passe incorrect.";
+    if(/already registered|already exists/i.test(m))return "Un compte existe déjà avec cet e-mail : connectez-vous.";
+    if(/Email not confirmed/i.test(m))return "Confirmez d'abord votre adresse e-mail avec le lien reçu, puis connectez-vous.";
+    if(/Password should be/i.test(m))return "Mot de passe trop faible pour le serveur (6 caractères minimum).";
+    if(/JWT expired/i.test(m)||statut===401)return "Session expirée : reconnectez-vous.";
+    return m||"Erreur du serveur ("+statut+").";
+  }
+  async function appel(chemin,{methode="GET",corps,jeton=true,prefer}={}){
+    if(jeton&&session&&session.expires_at*1000<Date.now()+60000)await rafraichir();
+    let r;
+    try{r=await fetch(SUPABASE.url.replace(/\/+$/,"")+chemin,{method:methode,
+      headers:{apikey:SUPABASE.cle,"Content-Type":"application/json",Authorization:"Bearer "+(jeton&&session?session.access_token:SUPABASE.cle),...(prefer?{Prefer:prefer}:{})},
+      body:corps===undefined?undefined:JSON.stringify(corps)})}
+    catch(e){const x=new Error("Pas de connexion Internet.");x.reseau=true;throw x}
+    const t=await r.text();let d=null;try{d=t?JSON.parse(t):null}catch(e){d=t}
+    if(!r.ok){const x=new Error(message(d,r.status));x.statut=r.status;throw x}
+    return d;
+  }
+  async function rafraichir(){
+    const s=session;session=null;
+    try{garderSession(await appel("/auth/v1/token?grant_type=refresh_token",{methode:"POST",corps:{refresh_token:s.refresh_token},jeton:false}))}
+    catch(e){if(e.reseau){session=s;throw e}garderSession(null);throw e}
+  }
+  const rpc=(f,args)=>appel("/rest/v1/rpc/"+f,{methode:"POST",corps:args});
+  async function toutLire(table,select){
+    const L=[];
+    for(let n=0;;n+=1000){
+      const p=await appel(`/rest/v1/${table}?entreprise_id=eq.${acces.entreprise}&select=${select}&limit=1000&offset=${n}`);
+      L.push(...p);if(p.length<1000)return L;
+    }
+  }
+
+  // Forme envoyée au serveur : montants arrondis au centime, champs connus seulement.
+  const formeEcriture=e=>({id:e.id,date:e.date,piece:e.piece||"",libelle:e.libelle,lien:e.lien||null,
+    lignes:e.lignes.map(l=>({compte:String(l.compte),debit:Moteur.arrondir(l.debit||0),credit:Moteur.arrondir(l.credit||0)}))});
+  const formeFacture=f=>Object.assign({},f,{ht:Moteur.arrondir(f.ht),tva:Moteur.arrondir(f.tva),ttc:Moteur.arrondir(f.ttc)});
+  function photo(d){
+    const m={e:{},f:{},c:{},p:JSON.stringify(d.params)};
+    d.ecritures.forEach(e=>m.e[e.id]=JSON.stringify(formeEcriture(e)));
+    d.factures.forEach(f=>m.f[f.num]=JSON.stringify(formeFacture(f)));
+    d.comptes.forEach(c=>m.c[c.num]=c.nom);
+    return m;
+  }
+
+  // Envoie au serveur ce qui a changé depuis le dernier envoi réussi.
+  async function pousser(){
+    if(!connecte())return;
+    if(enCours){encore=true;return enCours}
+    enCours=(async()=>{
+      const eid=acces.entreprise,a=miroir||{e:{},f:{},c:{},p:""},b=photo(db);let refus=[];
+      signaler("envoi");
+      try{
+        const pas=async(fn,ok)=>{try{await fn();ok()}catch(e){if(e.reseau||e.statut===401||!e.statut)throw e;refus.push(e.message)}};
+        for(const id in a.e)if(!(id in b.e))await pas(()=>rpc("supprimer_ecriture",{p_entreprise:eid,p_id:id}),()=>delete a.e[id]);
+        for(const n in a.f)if(!(n in b.f))await pas(()=>rpc("supprimer_facture",{p_entreprise:eid,p_num:n}),()=>delete a.f[n]);
+        for(const id in b.e)if(a.e[id]!==b.e[id])await pas(()=>rpc("enregistrer_ecriture",{p_entreprise:eid,p_ecriture:JSON.parse(b.e[id])}),()=>a.e[id]=b.e[id]);
+        for(const n in b.f)if(a.f[n]!==b.f[n])await pas(()=>rpc("enregistrer_facture",{p_entreprise:eid,p_facture:JSON.parse(b.f[n])}),()=>a.f[n]=b.f[n]);
+        for(const n in a.c)if(!(n in b.c))await pas(()=>appel(`/rest/v1/comptes_perso?entreprise_id=eq.${eid}&num=eq.${encodeURIComponent(n)}`,{methode:"DELETE"}),()=>delete a.c[n]);
+        for(const n in b.c)if(a.c[n]!==b.c[n])await pas(()=>appel(`/rest/v1/comptes_perso?on_conflict=entreprise_id,num`,{methode:"POST",prefer:"resolution=merge-duplicates",corps:{entreprise_id:eid,num:n,nom:b.c[n]}}),()=>a.c[n]=b.c[n]);
+        if(a.p!==b.p){const p=db.params;await pas(()=>appel(`/rest/v1/entreprises?id=eq.${eid}`,{methode:"PATCH",corps:{nom:p.societe||"Mon entreprise",pays:p.pays||null,devise:p.devise,params:p}}),()=>a.p=b.p)}
+        miroir=a;garderMiroir();
+        refus.length?signaler("erreur",(refus.length>1?refus.length+" éléments refusés par le serveur. ":"Refusé par le serveur : ")+refus[0]):signaler("ok");
+      }catch(e){
+        miroir=a;garderMiroir();
+        if(e.statut===401||!session){signaler("erreur","Session expirée : reconnectez-vous pour envoyer vos modifications.")}
+        else signaler("attente","modifications enregistrées sur cet appareil, envoi dès le retour de la connexion.");
+      }
+    })();
+    try{await enCours}finally{enCours=null;if(encore){encore=false;planifier()}}
+  }
+  const planifier=()=>{if(!connecte())return;clearTimeout(minuterie);minuterie=setTimeout(pousser,400)};
+
+  // Charge le dossier de l'entreprise depuis le serveur et remplace la copie locale.
+  async function tirer(){
+    const [ent]=await appel(`/rest/v1/entreprises?id=eq.${acces.entreprise}&select=nom,pays,devise,params`);
+    if(!ent)throw new Error("Entreprise introuvable sur le serveur.");
+    const E=await toutLire("ecritures","id,date,piece,libelle,lien,lignes(rang,compte,debit,credit)&order=date,id");
+    const F=await toutLire("factures","donnees&order=date,num");
+    const C=await toutLire("comptes_perso","num,nom&order=num");
+    const d=normaliser({
+      ecritures:E.map(e=>{const x={id:e.id,date:e.date,piece:e.piece,libelle:e.libelle,
+        lignes:e.lignes.sort((a,b)=>a.rang-b.rang).map(l=>({compte:l.compte,debit:Moteur.enUnites(l.debit),credit:Moteur.enUnites(l.credit)}))};
+        if(e.lien)x.lien=e.lien;return x}),
+      factures:F.map(f=>f.donnees),comptes:C,
+      params:Object.assign({},ent.params,{societe:ent.nom,pays:ent.pays||"",devise:ent.devise})});
+    db=d;try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}
+    miroir=photo(db);garderMiroir();signaler("ok");
+  }
+
+  const vierge=()=>{const c=acces.compte||{},x=pays(c.paysCode)||[];
+    return normaliser({ecritures:[],factures:[],comptes:[],params:Object.assign({},PARAMS0,{societe:c.nom||PARAMS0.societe,pays:c.paysCode||"",devise:x[3]||PARAMS0.devise,tel:c.tel||"",email:c.email||""})})};
+  const garderLocal=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}};
+
+  // Après la connexion : ouvre l'entreprise de l'utilisateur, ou la crée.
+  // Les données de ce navigateur ne partent en ligne que si l'utilisateur l'accepte.
+  async function ouvrir(){
+    const L=await appel("/rest/v1/membres?select=entreprise_id,role&order=ajoute_le");
+    const lie=miroir&&L.find(m=>m.entreprise_id===acces.entreprise);
+    if(lie){acces.role=lie.role;saveAcces();await pousser();await tirer();return}
+    const m=L[0],ne=db.ecritures.length,nf=db.factures.length;let vide=true;
+    if(m){
+      acces.entreprise=m.entreprise_id;acces.role=m.role;saveAcces();
+      vide=!(await appel(`/rest/v1/ecritures?entreprise_id=eq.${m.entreprise_id}&select=id&limit=1`)).length
+        &&!(await appel(`/rest/v1/factures?entreprise_id=eq.${m.entreprise_id}&select=num&limit=1`)).length;
+    }
+    if(ne+nf)try{localStorage.setItem(KEY+".avant-connexion",JSON.stringify(db))}catch(e){}
+    const envoyer=ne+nf>0&&vide&&confirm(`Ce navigateur contient ${ne} écriture(s) et ${nf} facture(s) enregistrées hors ligne.\n\nOK : les ajouter à votre compte en ligne.\nAnnuler : ne pas les envoyer (une copie reste sur cet appareil).`);
+    if(m&&!envoyer){miroir=null;await tirer();return}
+    if(!envoyer)db=vierge();
+    if(!m){
+      const p=db.params;if(!p.pays&&acces.compte)p.pays=acces.compte.paysCode||"";
+      acces.entreprise=await rpc("creer_entreprise",{p_nom:p.societe||"Mon entreprise",p_pays:p.pays||"",p_devise:p.devise||PARAMS0.devise,p_params:p});
+      saveAcces();
+    }
+    miroir={e:{},f:{},c:{},p:m?"":JSON.stringify(db.params)};garderLocal();
+    await pousser();
+  }
+  // Modifications pas encore acceptées par le serveur.
+  const enAttente=()=>{if(!miroir)return 0;const b=photo(db),a=miroir;let n=0;
+    for(const k of ["e","f","c"]){for(const x in b[k])if(a[k][x]!==b[k][x])n++;for(const x in a[k])if(!(x in b[k]))n++}
+    return n+(a.p!==b.p?1:0)};
+
+  async function inscrire(email,mdp,infos){
+    const d=await appel("/auth/v1/signup",{methode:"POST",corps:{email,password:mdp,data:infos},jeton:false});
+    if(!d||!d.access_token)return {confirmer:true};
+    garderSession(d);return {confirmer:false};
+  }
+  async function connecter(email,mdp){
+    garderSession(await appel("/auth/v1/token?grant_type=password",{methode:"POST",corps:{email,password:mdp},jeton:false}));
+    const p=(await appel(`/rest/v1/profils?select=nom,tel,pays`))[0]||{};
+    return p;
+  }
+  // Déconnexion : les données quittent ce navigateur (elles restent sur le serveur).
+  async function deconnecter(){
+    clearTimeout(minuterie);
+    if(connecte())await pousser();
+    const n=enAttente();
+    if(n&&!confirm(`${n} modification(s) n'ont pas encore été envoyées au serveur et seront perdues. Se déconnecter quand même ?`))return false;
+    try{if(session)await appel("/auth/v1/logout",{methode:"POST"})}catch(e){}
+    garderSession(null);miroir=null;garderMiroir();
+    acces.entreprise=null;acces.role=null;db=vierge();garderLocal();signaler("","");
+    return true;
+  }
+  // Au démarrage : envoie ce qui attendait, puis recharge les données du serveur.
+  async function demarrer(){
+    if(!connecte())return;
+    try{await pousser();if(etat.code==="ok")await tirer();if(ui.vue)go(ui.vue)}catch(e){signaler("attente","données de cet appareil affichées.")}
+  }
+  addEventListener("online",planifier);
+  return {actif,connecte,enAttente,planifier,pousser,tirer,ouvrir,inscrire,connecter,deconnecter,demarrer,texteEtat,photo};
+})();
+
 
 // ---------- Période ----------
 const dansPeriode=e=>(!ui.du||e.date>=ui.du)&&(!ui.au||e.date<=ui.au);
@@ -1291,8 +1464,22 @@ async function inscrire(){
   else if(!numeroIntl(v("pays"),v("tel")))err.push("Numéro de téléphone invalide pour ce pays (6 à 12 chiffres, sans l'indicatif).");
   if($("i_mdp").value.length<6)err.push("Mot de passe trop court (6 caractères minimum).");
   if($("i_mdp").value!==$("i_mdp2").value)err.push("Les deux mots de passe ne sont pas identiques.");
-  if(acces.compte&&acces.compte.email===v("email").toLowerCase())err.push("Un compte existe déjà avec cet e-mail : connectez-vous.");
+  if(!Nuage.actif()&&acces.compte&&acces.compte.email===v("email").toLowerCase())err.push("Un compte existe déjà avec cet e-mail : connectez-vous.");
   if(err.length){out.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
+  if(Nuage.actif()){
+    const email=v("email").toLowerCase(),tel=numeroIntl(v("pays"),v("tel"));
+    out.innerHTML=`<div class="msg">Création du compte…</div>`;
+    try{
+      const r=await Nuage.inscrire(email,$("i_mdp").value,{nom:v("nom"),tel,pays:v("pays")});
+      acces.compte={nom:v("nom"),email,tel,pays:pays(v("pays"))[1],paysCode:v("pays"),cree:Date.now(),nuage:true};
+      if(r.confirmer){acces.connecte=false;saveAcces();afficherPorte("connexion");$("c_email").value=email;
+        $("c_res").innerHTML=`<div class="msg ok">Compte créé. Ouvrez le lien de confirmation reçu par e-mail, puis connectez-vous ici.</div>`;return}
+      acces.connecte=true;saveAcces();
+      if(!db.ecritures.length&&!db.params.pays){const x=pays(v("pays"));db.params.pays=x[0];db.params.devise=x[3];if(!db.params.tel)db.params.tel=tel}
+      await Nuage.ouvrir();
+    }catch(e){out.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`;return}
+    toast("Compte créé ✔");afficherPorte("tarifs");return;
+  }
   acces.compte={nom:v("nom"),email:v("email").toLowerCase(),tel:numeroIntl(v("pays"),v("tel")),pays:pays(v("pays"))[1],paysCode:v("pays"),mdp:await hacher($("i_mdp").value),cree:Date.now()};
   acces.connecte=true;saveAcces();
   // Premier dossier : le pays et sa devise deviennent les paramètres de l'entreprise (modifiables ensuite).
@@ -1301,12 +1488,24 @@ async function inscrire(){
   afficherPorte("tarifs");
 }
 async function connecter(){
-  const e=$("c_email").value.trim().toLowerCase(),h=await hacher($("c_mdp").value);
-  if(!acces.compte||acces.compte.email!==e||acces.compte.mdp!==h){$("c_res").innerHTML=`<div class="msg bad">E-mail ou mot de passe incorrect.</div>`;return}
-  acces.connecte=true;saveAcces();toast("Connecté ✔");
+  const e=$("c_email").value.trim().toLowerCase();
+  if(Nuage.actif()){
+    $("c_res").innerHTML=`<div class="msg">Connexion…</div>`;
+    try{
+      const p=await Nuage.connecter(e,$("c_mdp").value);
+      const ancien=acces.compte&&acces.compte.email===e?acces.compte:{};
+      acces.compte={nom:p.nom||ancien.nom||e,email:e,tel:p.tel||"",paysCode:p.pays||"",pays:(pays(p.pays)||[])[1]||"",cree:ancien.cree||Date.now(),nuage:true};
+      acces.connecte=true;saveAcces();await Nuage.ouvrir();
+    }catch(x){$("c_res").innerHTML=`<div class="msg bad">${esc(x.message)}</div>`;return}
+  }else{
+    const h=await hacher($("c_mdp").value);
+    if(!acces.compte||acces.compte.email!==e||acces.compte.mdp!==h){$("c_res").innerHTML=`<div class="msg bad">E-mail ou mot de passe incorrect.</div>`;return}
+    acces.connecte=true;saveAcces();
+  }
+  toast("Connecté ✔");
   if(accesLibre()){$("gate").innerHTML="";go(ui.vue==="tarifs"?"dashboard":ui.vue)}else afficherPorte("tarifs");
 }
-function deconnexion(){acces.connecte=false;payPlan=null;saveAcces();$("gate").innerHTML="";etatAcces();afficherPorte("connexion")}
+async function deconnexion(){if(Nuage.connecte()&&!await Nuage.deconnecter())return;acces.connecte=false;payPlan=null;saveAcces();$("gate").innerHTML="";etatAcces();afficherPorte("connexion")}
 function choisirPlan(id){
   const p=PLANS.find(x=>x.id===id);if(!p)return;
   if(p.prix===0&&testUtilise())return;
@@ -1363,7 +1562,7 @@ function go(v){
   $("actions").innerHTML=`<button class="btn p" onclick="ui.mode='simple';saveUi();go('saisie')">${ico("plus",16)} Écriture</button><button class="btn hm" onclick="go('factures')">${ico("receipt",16)} Facturer</button><button class="ib" id="theme" onclick="basculerTheme()" title="Mode clair / sombre"></button><button class="av" onclick="go('tarifs')" title="Mon compte">${esc(qui.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase())}</button>`;
   appliquerTheme();
   const py=pays(db.params.pays);
-  $("entreprise").innerHTML=`<div class="row2">${ico("building",18)}<span style="flex:1;min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(db.params.societe)}</b><small>${esc(db.params.devise)}${py?" · "+esc(py[1]):""}</small></span></div>`;
+  $("entreprise").innerHTML=`<div class="row2">${ico("building",18)}<span style="flex:1;min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(db.params.societe)}</b><small>${esc(db.params.devise)}${py?" · "+esc(py[1]):""}</small><span id="nuage">${Nuage.texteEtat()}</span></span></div>`;
   if(v==="journal")jRendu();
   if(v==="factures"){fLigne();apercuFacture()}
   if(v==="saisie"){
@@ -1379,6 +1578,7 @@ $("logo").innerHTML=LOGO;
 appliquerTheme();
 go(accesLibre()?ui.vue:"dashboard");
 setInterval(etatAcces,30000);
+Nuage.demarrer();
 </script>
 </body>
 </html>

@@ -3,6 +3,7 @@
   "private": true,
   "description": "Assistant comptable SYSCOHADA",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "test:base": "tests/sql/lancer.sh"
   }
 }
