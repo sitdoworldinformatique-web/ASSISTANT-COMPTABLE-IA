@@ -4,86 +4,180 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CompteAssist – Assistant comptable SYSCOHADA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
 <style>
 :root{
- --bg:#f3f5f8;--card:#fff;--ink:#14202e;--mut:#64707f;--line:#e2e7ee;--soft:#eef2f7;
- --acc:#0f766e;--acc2:#e0f2f1;--gold:#b7791f;--ok:#15803d;--okbg:#e7f6ec;--bad:#b42318;--badbg:#fdecea;
- --side:#0d1b2a;--sideink:#b8c4d3;--shadow:0 1px 2px rgba(16,24,40,.05),0 2px 8px rgba(16,24,40,.04);
+ --bg:#f3f5f8;--card:#fff;--ink:#111c29;--mut:#5b6673;--line:#e2e7ee;--soft:#eef4ff;--soft2:#f6f8fb;
+ --acc:#0f766e;--accd:#005c55;--acc2:#e0f2f1;--sec:#d3e1f6;--secink:#24364d;
+ --gold:#945d00;--goldbg:#fef3c7;--ok:#15803d;--okbg:#e7f6ec;--bad:#b42318;--badbg:#fdecea;
+ --side:#26313f;--sideink:#bdc9c6;--sideacc:#80d5cb;--bar2:#d3e1f6;
+ --shadow:0 1px 2px rgba(16,24,40,.04),0 1px 6px rgba(16,24,40,.04);
+ --ff:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--fh:"Plus Jakarta Sans","Inter",system-ui,sans-serif;
+ --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 :root[data-theme="dark"]{
- --bg:#0b1220;--card:#121b2b;--ink:#e6ebf2;--mut:#93a0b2;--line:#233044;--soft:#1a2537;
- --acc:#2dd4bf;--acc2:#123b3a;--gold:#f6c065;--ok:#4ade80;--okbg:#10301e;--bad:#f87171;--badbg:#3a1616;
- --side:#070d18;--sideink:#9aa8bb;--shadow:none;
+ --bg:#0b1220;--card:#121b2b;--ink:#e6ebf2;--mut:#93a0b2;--line:#233044;--soft:#1a2537;--soft2:#162133;
+ --acc:#2dd4bf;--accd:#5eead4;--acc2:#123b3a;--sec:#22324a;--secink:#d6e4f9;
+ --gold:#f6c065;--goldbg:#3a2e12;--ok:#4ade80;--okbg:#10301e;--bad:#f87171;--badbg:#3a1616;
+ --side:#070d18;--sideink:#9aa8bb;--sideacc:#5eead4;--bar2:#3b4a63;--shadow:none;
 }
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
-.shell{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+body{margin:0;font:14px/1.5 var(--ff);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--fh);letter-spacing:-.01em}
+.ic{flex:none;vertical-align:middle}
+.shell{display:grid;grid-template-columns:256px 1fr;min-height:100vh}
 .shell>div{min-width:0}
-aside{background:var(--side);color:var(--sideink);padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto}
-.logo{display:flex;align-items:center;gap:10px;color:#fff;font-weight:700;font-size:17px;padding:4px 8px 18px}
-.logo i{font-style:normal;display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#14b8a6,#b7791f);font-size:17px}
-.logo small{display:block;font-weight:500;font-size:11px;color:var(--sideink);letter-spacing:.06em}
+/* Barre latérale */
+aside{background:var(--side);color:var(--sideink);position:sticky;top:0;height:100vh;overflow:auto;display:flex;flex-direction:column;justify-content:space-between;padding:20px 12px 14px;z-index:30}
+.logo{display:flex;align-items:center;gap:10px;color:#fff;padding:0 8px 18px}
+.logo i{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--acc);color:#fff;flex:none}
+.logo b{display:block;font-family:var(--fh);font-size:16px;line-height:1.2}
+.logo small{display:block;font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--sideacc);text-transform:uppercase}
 nav{display:flex;flex-direction:column;gap:2px}
-nav button{display:flex;align-items:center;gap:10px;background:none;border:0;color:var(--sideink);padding:9px 10px;cursor:pointer;font:inherit;font-size:14px;border-radius:8px;text-align:left;white-space:nowrap}
-nav button:hover{background:rgba(255,255,255,.06);color:#fff}
-nav button.on{background:rgba(45,212,191,.16);color:#fff}
-nav button span{width:22px;text-align:center}
-.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--card)}
-.top h1{font-size:19px;margin:0;margin-right:auto}
-.top #theme{order:2}
-.per{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);flex-wrap:wrap}
-.per input{width:auto;padding:6px 8px}
-main{padding:20px 24px;max-width:1150px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
-.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:16px}
-.kpi{margin:0;position:relative;overflow:hidden}
-.kpi span{color:var(--mut);font-size:13px}.kpi b{display:block;font-size:22px;margin-top:4px;font-variant-numeric:tabular-nums}
-.kpi em{font-style:normal;font-size:12px;color:var(--mut)}
-.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--acc))}
+nav button{display:flex;align-items:center;gap:10px;background:none;border:0;color:var(--sideink);padding:8px 10px;cursor:pointer;font:600 13px var(--ff);border-radius:8px;text-align:left;white-space:nowrap}
+nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+nav button.on{background:#0f766e;color:#fff}
+.sidefoot{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.sidecard{background:rgba(255,255,255,.07);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;border:0;text-align:left;font-family:var(--ff);cursor:pointer;display:block;width:100%}
+.sidecard:hover{background:rgba(255,255,255,.11)}
+.sidecard small{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sideink)}
+.sidecard .row2{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:99px;background:#945d00;color:#fff;white-space:nowrap}
+.pill.t{background:rgba(255,255,255,.14)}
+/* Barre du haut */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 24px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:20;min-height:64px}
+.crumb{font-size:13px;color:var(--mut);margin-right:4px}.crumb b{color:var(--ink)}
+#titre{font-size:13px;margin:0;font-weight:700;font-family:var(--ff);display:inline}
+.per{display:flex;align-items:center;gap:6px;background:var(--soft);border-radius:10px;padding:4px 6px 4px 10px;font-size:12px;color:var(--mut);flex-wrap:wrap}
+.per input{width:auto;padding:4px 6px;border:0;background:transparent;font-size:12.5px}
+.sp{flex:1}
+.ib{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;border:0;background:none;color:var(--ink);cursor:pointer}
+.ib:hover{background:var(--soft)}
+.av{width:36px;height:36px;border-radius:50%;background:var(--accd);color:#fff;border:0;font:700 13px var(--ff);cursor:pointer;display:grid;place-items:center}
+main{padding:24px;max-width:1440px}
+/* Composants */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:var(--shadow)}
+.card.flat{box-shadow:none}
+h2{margin:0 0 14px;font-size:17px;font-weight:600}
+.sub{color:var(--mut);font-size:13px;margin:-10px 0 14px}
+.mic{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+.mut{color:var(--mut)}.hide{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:20px}
+.cols{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.c2{display:grid;gap:20px;grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr);align-items:start}
+.c2>*{min-width:0}
+.kpi{margin:0;position:relative;border-left:4px solid var(--c,var(--acc));display:flex;flex-direction:column;gap:6px;padding:16px 16px 14px}
+.kpi .v{font:700 24px/1.15 var(--ff);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:13px;font-weight:600;color:var(--mut);margin-left:4px}
+.kpi .d{font-size:12px;color:var(--mut)}
+.kpi .lt{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.kl{display:flex;justify-content:space-between;gap:8px;background:var(--soft2);border-radius:6px;padding:3px 8px;font-size:12px}
+.kl b{font-variant-numeric:tabular-nums}
 .tw{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-th{color:var(--mut);font-weight:600;font-size:13px;background:var(--soft)}
-tr.tot th{background:none;color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase;background:var(--soft)}
+tbody tr:hover td,table tr:hover td{background:color-mix(in srgb,var(--soft) 45%,transparent)}
+tr.tot th{background:var(--soft);color:var(--ink);font-size:13px;text-transform:none;letter-spacing:0}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-a{color:var(--acc)}
-label{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
-input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
-input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
-.btn{display:inline-flex;align-items:center;gap:6px;border:0;padding:9px 14px;border-radius:8px;cursor:pointer;font:inherit;font-size:14px;background:var(--soft);color:var(--ink)}
-.btn.p{background:var(--acc);color:#fff}:root[data-theme="dark"] .btn.p{color:#04201d}
-.btn.sm{padding:5px 9px;font-size:13px}
-.btn.x{background:none;color:var(--bad);padding:4px 6px}
+.pc{display:inline-block;font:700 11px var(--mono);background:var(--soft);color:var(--secink);padding:2px 6px;border-radius:4px;white-space:nowrap}
+.cpt{font:700 12.5px var(--mono);color:var(--ink);background:none;border:0;padding:0;cursor:pointer}
+.cpt.k5{color:var(--acc)}.cpt.k6{color:var(--bad)}.cpt.k7{color:var(--ok)}.cpt.k1{color:var(--gold)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--mut)}
+.deb{color:var(--bad)}.cre{color:var(--ok)}
+a{color:var(--acc);font-weight:600;text-decoration:none}a:hover{text-decoration:underline}
+label{display:block;font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid transparent;border-radius:8px;font:inherit;background:var(--soft);color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px;background:var(--card)}
+input:disabled{opacity:.6}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;padding:9px 14px;border-radius:8px;cursor:pointer;font:600 13.5px var(--ff);background:var(--sec);color:var(--secink);white-space:nowrap}
+.btn:hover{filter:brightness(.97)}
+.btn.p{background:var(--acc);color:#fff}.btn.p:hover{background:var(--accd)}
+:root[data-theme="dark"] .btn.p{color:#04201d}
+.btn.o{background:var(--card);border:1px solid var(--line);color:var(--ink)}
+.btn.sm{padding:6px 10px;font-size:12.5px}
+.btn.x{background:none;color:var(--mut);padding:4px 6px}.btn.x:hover{color:var(--bad)}
+.btn.w{width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .icon{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer;color:var(--ink);font:inherit;font-size:13px}
-.f{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:12px}
+.f{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:14px}
 .f .w2{grid-column:span 2}
 .row{display:grid;gap:8px;grid-template-columns:2fr 1fr 1fr auto;margin-bottom:6px}
-.msg{padding:9px 12px;border-radius:8px;margin-top:10px;font-size:14px}.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}
-h2{margin:0 0 14px;font-size:16px}.hide{display:none!important}.mut{color:var(--mut)}
+.msg{padding:10px 14px;border-radius:8px;margin:0 0 14px;font-size:13.5px;display:flex;gap:8px;align-items:flex-start}
+.msg+.msg{margin-top:-6px}
+#qres .msg,#res .msg,#fres .msg,#sres .msg,#cres .msg,#i_res .msg,#c_res .msg,#pres .msg{margin:12px 0 0}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--goldbg);color:var(--gold)}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}.head h2{margin:0;margin-right:auto}
-.cols{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--mut);font-weight:500}
-.tag.ok{background:var(--okbg);color:var(--ok)}.tag.bad{background:var(--badbg);color:var(--bad)}
-.tabs{display:flex;flex-wrap:wrap;gap:4px;background:var(--soft);padding:4px;border-radius:10px;width:fit-content;max-width:100%;margin-bottom:14px}
-.tabs button{border:0;background:none;padding:7px 14px;border-radius:7px;cursor:pointer;font:inherit;font-size:14px;color:var(--mut)}
-.tabs button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
-.hint{background:var(--acc2);color:var(--ink);border-radius:8px;padding:8px 12px;font-size:14px;margin-bottom:10px}
-.legend{display:flex;gap:14px;font-size:13px;color:var(--mut)}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
-#toast{position:fixed;right:16px;bottom:16px;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;z-index:50}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--soft);color:var(--mut);letter-spacing:.02em;white-space:nowrap}
+.tag.ok{background:var(--okbg);color:var(--ok)}.tag.bad{background:var(--badbg);color:var(--bad)}.tag.warn{background:var(--goldbg);color:var(--gold)}.tag.acc{background:var(--acc2);color:var(--accd)}
+:root[data-theme="dark"] .tag.acc{color:var(--acc)}
+.tabs,.seg{display:flex;flex-wrap:wrap;gap:4px;background:var(--soft);padding:4px;border-radius:10px;width:fit-content;max-width:100%}
+.tabs button,.seg button{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:8px 14px;border-radius:7px;cursor:pointer;font:600 13px var(--ff);color:var(--mut)}
+.tabs button.on{background:var(--acc);color:#fff}
+:root[data-theme="dark"] .tabs button.on{color:#04201d}
+.seg.s button{padding:4px 10px;font-size:12px}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.nat{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:16px}
+.nat button{display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:8px;padding:10px;background:var(--soft2);color:var(--mut);font:600 13.5px var(--ff);cursor:pointer}
+.nat button.on.dep{background:var(--badbg);color:var(--bad)}.nat button.on.rec{background:var(--okbg);color:var(--ok)}.nat button.on.vir{background:var(--acc2);color:var(--accd)}
+.hint{background:var(--acc2);color:var(--accd);border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;margin:8px 0 0;display:flex;gap:8px;align-items:center}
+:root[data-theme="dark"] .hint{color:var(--acc)}
+.hint.warn{background:var(--goldbg);color:var(--gold)}
+.big{font:700 24px var(--ff)!important;text-align:right;letter-spacing:-.02em;padding-right:56px!important}
+.money{position:relative}.money em{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-style:normal;font-size:12px;font-weight:700;color:var(--mut)}
+.opts{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px}
+.opt{position:relative;display:flex;gap:8px;align-items:flex-start;background:var(--soft2);border:1.5px solid transparent;border-radius:10px;padding:10px 44px 10px 10px;cursor:pointer;margin:0;font-weight:400}
+.opt:has(input:checked){border-color:var(--acc);background:var(--acc2)}
+.opt input{width:auto;margin:2px 0 0;accent-color:var(--acc)}
+.opt span{display:flex;flex-direction:column;font-size:13px;min-width:0}.opt span b{font-weight:600}.opt span em{font-style:normal;font-size:11.5px;color:var(--mut)}
+.opt code{position:absolute;right:8px;top:8px;font:700 10.5px var(--mono);background:var(--card);padding:1px 5px;border-radius:4px;color:var(--secink)}
+.sim{background:var(--soft2);border-radius:10px;padding:14px;margin:4px 0 16px}
+.sim table{font-size:13px}.sim th{background:none;padding:6px 8px}.sim td{padding:7px 8px;border:0}
+.ptile{display:flex;align-items:center;gap:14px}
+.tile{display:grid;place-items:center;width:44px;height:44px;border-radius:10px;background:var(--acc2);color:var(--accd);flex:none}
+:root[data-theme="dark"] .tile{color:var(--acc)}
+.tile.g{background:var(--goldbg);color:var(--gold)}.tile.r{background:var(--badbg);color:var(--bad)}.tile.v{background:var(--okbg);color:var(--ok)}
+.phead{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.phead h1{font-size:22px;margin:0;line-height:1.25}
+.phead p{margin:2px 0 0;color:var(--mut)}
+.status{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px}
+.status .tile{width:32px;height:32px;border-radius:8px}
+.totbar{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center;background:linear-gradient(90deg,var(--acc2),var(--soft));border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:20px}
+.totbar b{font-size:18px;font-variant-numeric:tabular-nums}
+.li{display:flex;align-items:center;gap:12px;background:var(--soft2);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.li .tile{width:34px;height:34px;border-radius:50%}
+.li .grow{flex:1;min-width:0}.li .grow b{font-size:13.5px}.li .grow div{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li .amt{text-align:right;font-size:12px;color:var(--mut);white-space:nowrap}.li .amt b{display:block;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
+.mv{border-radius:8px;background:var(--soft2);padding:10px 12px;margin-bottom:8px;font-size:12.5px}
+.mv .r{display:flex;justify-content:space-between;gap:8px}
+.tiles2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.tiles2>div{background:var(--soft2);border-radius:10px;padding:10px 12px}
+.tiles2 b{display:block;font-size:16px;margin-top:4px;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:14px;font-size:12.5px;color:var(--mut);flex-wrap:wrap}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;background:var(--soft);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13px}
+.inl{display:grid;gap:8px;grid-template-columns:minmax(0,3fr) 70px 110px 110px 34px;align-items:center;margin-bottom:8px}
+.inl input{padding:8px 10px}.inl output{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;font-size:13px}
+.pro{border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+.pro .tt{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:5px 0}
+.pro .ttc{background:var(--soft);border-radius:8px;padding:10px 12px;margin-top:6px}
+.pro .ttc b{font-size:20px;color:var(--accd)}
+:root[data-theme="dark"] .pro .ttc b{color:var(--acc)}
+#toast{position:fixed;right:16px;bottom:16px;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;z-index:80}
 #toast.show{opacity:1;transform:none}
 .modal{position:fixed;inset:0;background:rgba(5,10,20,.55);display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto;z-index:70}
-.modal .card{width:100%;max-width:720px}
-.inv{color:#111;background:#fff;border-radius:10px;padding:28px}
-.inv table th{background:#f2f4f7;color:#444}.inv td,.inv th{border-color:#e5e7eb}
-.inv h3{margin:0;font-size:22px;color:#0f766e}
+.modal .card{width:100%;max-width:760px}
+.inv{color:#111;background:#fff;border-radius:10px;padding:28px;font-family:var(--ff)}
+.inv table th{background:#eef4ff;color:#3e4947}.inv td,.inv th{border-color:#e2e7ee}
+.inv h3{margin:0;font-size:22px;color:#0f766e;font-family:var(--fh)}
 .printhead{display:none}
-.banner{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 24px;background:var(--acc2);font-size:14px;border-bottom:1px solid var(--line)}
 .gate{position:fixed;inset:0;background:var(--bg);z-index:60;overflow:auto;padding:30px 16px}
+.gate .logo{color:var(--ink);justify-content:center}.gate .logo small{color:var(--acc)}
 .plans{display:grid;gap:14px;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:8px;max-width:1000px;margin-left:auto;margin-right:auto}
 @media (max-width:900px){.plans{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .plan.test{border:2px dashed var(--gold)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
 .steps{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:0 0 16px;font-size:13px}
 .steps span{padding:4px 12px;border-radius:99px;background:var(--soft);color:var(--mut)}
 .steps span.on{background:var(--acc);color:#fff}.steps span.fait{background:var(--okbg);color:var(--ok)}
@@ -95,21 +189,24 @@ h2{margin:0 0 14px;font-size:16px}.hide{display:none!important}.mut{color:var(--
 .plan.pop{border:2px solid var(--acc)}
 .plan .badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;font-size:12px;padding:2px 10px;border-radius:99px;white-space:nowrap}
 :root[data-theme="dark"] .plan .badge{color:#04201d}
+@media (max-width:1100px){.c2{grid-template-columns:1fr}}
 @media (max-width:820px){
  .shell{grid-template-columns:1fr}
- aside{position:sticky;height:auto;padding:8px 10px;z-index:30}
- .logo{padding:4px 6px 8px}
+ aside{position:sticky;height:auto;padding:8px 10px;flex-direction:column;justify-content:flex-start}
+ .logo{padding:2px 6px 8px}.sidefoot{display:none}
  nav{flex-direction:row;overflow-x:auto;padding-bottom:4px}
- .top{padding:12px 16px}main{padding:16px}
+ .top{padding:10px 16px;position:static}main{padding:16px}
  .f .w2{grid-column:auto}
- .top #theme{order:0}.per{width:100%;order:3}
- .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpi b{font-size:18px}.kpi{padding:14px}
+ .per{width:100%;order:3}
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpi .v{font-size:19px}.kpi{padding:12px}
+ .inl{grid-template-columns:1fr 60px 1fr 30px}.inl output{display:none}
+ .hm{display:none!important}
 }
-@media (max-width:600px){.row{grid-template-columns:1fr 1fr!important}.row>*:first-child,#lib{grid-column:1/-1}.inv{padding:16px}}
+@media (max-width:600px){.row.mic{display:none}.row{grid-template-columns:1fr 1fr!important}.row>*:first-child,#lib{grid-column:1/-1}.inv{padding:16px}.nat{grid-template-columns:1fr}}
 @media print{
- aside,.top,.noprint,button,#toast,.banner,.gate{display:none!important}
+ aside,.top,.noprint,button,#toast,.gate{display:none!important}
  .shell{display:block}main{padding:0;max-width:none}
- .card{border:0;box-shadow:none;padding:0}
+ .card{border:0;box-shadow:none;padding:0}.c2{display:block}
  .printhead{display:block;margin-bottom:12px}
  body{background:#fff;color:#000}
  body.mopen .shell{display:none}
@@ -120,20 +217,24 @@ h2{margin:0 0 14px;font-size:16px}.hide{display:none!important}.mut{color:var(--
 <body>
 <div class="shell">
  <aside>
-  <div class="logo"><i>📒</i><div>CompteAssist<small>SYSCOHADA RÉVISÉ</small></div></div>
-  <nav id="nav"></nav>
+  <div>
+   <div class="logo" id="logo"></div>
+   <nav id="nav"></nav>
+  </div>
+  <div class="sidefoot noprint">
+   <button class="sidecard hide" id="banner" onclick="go('tarifs')"></button>
+   <button class="sidecard" id="entreprise" onclick="go('parametres')"></button>
+  </div>
  </aside>
  <div>
-  <div id="banner" class="banner noprint hide"></div>
   <div class="top">
-   <h1 id="titre"></h1>
-   <button class="icon" id="theme" onclick="basculerTheme()" title="Mode clair / sombre">🌙</button>
+   <div class="crumb">Comptabilité / <h1 id="titre"></h1></div>
    <div class="per noprint" title="Limite les écritures affichées à cette période">
-    Période du <input type="date" id="du" onchange="periode()"> au <input type="date" id="au" onchange="periode()">
-    <button class="icon" onclick="periodePreset('mois')">Ce mois</button>
-    <button class="icon" onclick="periodePreset('annee')">Cette année</button>
-    <button class="icon" onclick="periodePreset('tout')">Tout</button>
+    <span class="mic">Période</span><input type="date" id="du" onchange="periode()" aria-label="Du"> – <input type="date" id="au" onchange="periode()" aria-label="Au">
+    <div class="seg s" id="presets"></div>
    </div>
+   <div class="sp"></div>
+   <div class="bar noprint" id="actions"></div>
   </div>
   <main id="app"></main>
  </div>
@@ -241,6 +342,12 @@ const Moteur=(()=>{
     const h=enCentimes(ht),tva=Math.round(h*(Number(taux)||0)/100);
     return {ht:enUnites(h),tva:enUnites(tva),ttc:enUnites(h+tva)};
   }
+  // Facture sur plusieurs lignes : montant de chaque ligne = quantité × prix unitaire, arrondi au centime.
+  function calculFactureLignes(lignes,taux){
+    const L=lignes.map(l=>{const qte=Number(l.qte)||0,pu=Number(l.pu)||0,c=Math.round(enCentimes(pu)*qte);return {des:l.des,qte,pu:arrondir(pu),montant:enUnites(c),c}});
+    const h=L.reduce((a,l)=>a+l.c,0),tva=Math.round(h*(Number(taux)||0)/100);
+    return {lignes:L.map(({c,...l})=>l),ht:enUnites(h),tva:enUnites(tva),ttc:enUnites(h+tva)};
+  }
   function lignesFacture({ht,tva,ttc,compte}){
     const L=[{compte:"411",debit:ttc,credit:0},{compte,debit:0,credit:ht}];
     if(enCentimes(tva))L.push({compte:"4431",debit:0,credit:tva});
@@ -273,7 +380,7 @@ const Moteur=(()=>{
     return err;
   }
 
-  return {enCentimes,enUnites,arrondir,somme,equilibree,verifierLignes,soldes,sd,resultat,bilan,balance,grandLivre,calculFacture,lignesFacture,controleSauvegarde};
+  return {enCentimes,enUnites,arrondir,somme,equilibree,verifierLignes,soldes,sd,resultat,bilan,balance,grandLivre,calculFacture,calculFactureLignes,lignesFacture,controleSauvegarde};
 })();
 if(typeof module==="object"&&module.exports)module.exports=Moteur;
 </script>
@@ -370,7 +477,7 @@ function charger(){
 }
 let db=charger();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert("Impossible d'enregistrer dans ce navigateur. Faites une sauvegarde depuis Paramètres.")}};
-let ui={vue:"dashboard",du:"",au:"",theme:"",gl:"",mode:"simple",q:""};
+let ui={vue:"dashboard",du:"",au:"",theme:"",gl:"",mode:"simple",q:"",jq:""};
 try{Object.assign(ui,JSON.parse(localStorage.getItem(UIKEY)||"{}"))}catch(e){}
 const saveUi=()=>{try{localStorage.setItem(UIKEY,JSON.stringify(ui))}catch(e){}};
 
@@ -393,7 +500,7 @@ function appliquerTheme(){
   let sombre=ui.theme==="dark";
   if(!ui.theme){try{sombre=matchMedia("(prefers-color-scheme: dark)").matches}catch(e){}}
   document.documentElement.dataset.theme=sombre?"dark":"light";
-  $("theme").textContent=sombre?"☀️":"🌙";
+  const t=$("theme");if(t)t.innerHTML=ico(sombre?"sun":"moon",19);
 }
 function basculerTheme(){ui.theme=document.documentElement.dataset.theme==="dark"?"light":"dark";saveUi();appliquerTheme()}
 
@@ -420,7 +527,7 @@ const soldes=(list=ecrP())=>Moteur.soldes(list);
 const sd=Moteur.sd;
 const resultat=(list=ecrP())=>Moteur.resultat(list);
 const bilan=()=>Moteur.bilan(ecrJusquAu());
-const factStatut=f=>f.annulee?["Annulée",""]:f.payee?["Payée","ok"]:["À encaisser","bad"];
+const factStatut=f=>f.annulee?["Annulée",""]:f.payee?["Payée","ok"]:enRetard(f)?["En retard","bad"]:["À encaisser","warn"];
 const sens=v=>v>=0.005?"D":v<=-0.005?"C":"";
 
 // ---------- Petits composants ----------
@@ -435,69 +542,265 @@ function optionsComptes(filtre,sel){
 }
 const optionsTreso=sel=>TRESO.map(([c,n])=>`<option value="${c}"${c===sel?" selected":""}>${n} (${c})</option>`).join("");
 
+// ---------- Icônes (dessinées en ligne : l'application fonctionne sans Internet) ----------
+const ICO={
+ grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+ edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+ book:'<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
+ ledger:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/><path d="M8 7h8M8 11h6"/>',
+ scale:'<path d="M12 3v18M5 7h14M7 21h10"/><path d="m5 7-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/>',
+ chart:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
+ bank:'<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6"/>',
+ receipt:'<path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+ tree:'<rect x="3" y="3" width="6" height="5" rx="1"/><rect x="15" y="10" width="6" height="5" rx="1"/><rect x="15" y="17" width="6" height="4" rx="1"/><path d="M6 8v11h9M6 12.5h9"/>',
+ gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+ card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+ moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+ download:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+ upload:'<path d="M12 15V3M7 8l5-5 5 5M5 21h14"/>',
+ print:'<path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+ up:'<path d="M7 17 17 7M8 7h9v9"/>',
+ down:'<path d="M12 5v14M5 12l7 7 7-7"/>',
+ swap:'<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ wallet:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"/><circle cx="16" cy="14.5" r="1.2"/>',
+ alert:'<path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/>',
+ eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+ cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+ trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/>',
+ file:'<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/>',
+ building:'<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/>',
+ spark:'<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+ x:'<path d="M18 6 6 18M6 6l12 12"/>',
+ arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>'
+};
+const ico=(n,s=20)=>`<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]||""}</svg>`;
+const LOGO=`<i>${ico("book",19)}</i><div><b>CompteAssist</b><small>SYSCOHADA révisé</small></div>`;
+const cptCls=c=>"cpt k"+classe(c);
+const pastille=c=>`<span class="dot" style="background:${{"5":"var(--acc)","6":"var(--bad)","7":"var(--ok)","1":"var(--gold)"}[classe(c)]||"var(--mut)"}"></span>`;
+const unite=()=>`<small>${esc(db.params.devise)}</small>`;
+const enRetard=f=>!f.annulee&&!f.payee&&f.echeance&&f.echeance<today();
+const joursEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/86400000);
+const echeanceTexte=f=>{if(!f.echeance)return "";const j=joursEntre(today(),f.echeance);
+  return `Échéance ${dfr(f.echeance)}${f.payee||f.annulee?"":j<0?` · en retard de ${-j} j`:j===0?" · aujourd'hui":` · dans ${j} j`}`};
+
+// Produits et charges par mois (classes 7 et 6), pour les graphiques.
+function parMois(n=6){
+  const fin=ui.au||today();let y=+fin.slice(0,4),m=+fin.slice(5,7);const mois=[];
+  for(let i=0;i<n;i++){mois.unshift(`${y}-${String(m).padStart(2,"0")}`);if(--m===0){m=12;y--}}
+  return mois.map(k=>{const r=Moteur.resultat(db.ecritures.filter(e=>e.date.startsWith(k)));return {k,p:Math.max(r.prod,0),c:Math.max(r.ch,0)}});
+}
+const NOMS_MOIS=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
+function courbe(vals,coul){
+  const W=120,H=34,max=Math.max(1,...vals);
+  const pts=vals.map((v,i)=>`${(i/(vals.length-1||1)*W).toFixed(1)},${(H-3-v/max*(H-8)).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><polygon points="0,${H} ${pts} ${W},${H}" fill="${coul}" opacity=".12"/><polyline points="${pts}" fill="none" stroke="${coul}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+function graphique(){
+  const data=parMois(6),max=Math.max(1,...data.flatMap(d=>[d.p,d.c]));
+  const W=640,H=230,bw=30,gx=W/6,enCours=(today().slice(0,7));
+  const grille=[0,.5,1].map(t=>`<line x1="0" x2="${W}" y1="${H-26-t*(H-50)}" y2="${H-26-t*(H-50)}" stroke="var(--line)"/>`).join("");
+  const bars=data.map((d,i)=>{const x=i*gx+gx/2,hp=d.p/max*(H-50),hc=d.c/max*(H-50),cur=d.k===enCours;
+   return `<rect x="${x-bw-3}" y="${H-26-hp}" width="${bw}" height="${hp}" rx="3" fill="var(--accd)"><title>Produits ${fmt(d.p)}</title></rect>
+    <rect x="${x+3}" y="${H-26-hc}" width="${bw}" height="${hc}" rx="3" fill="var(--bar2)"><title>Charges ${fmt(d.c)}</title></rect>
+    <text x="${x}" y="${H-7}" text-anchor="middle" font-size="12" font-weight="${cur?700:500}" fill="${cur?"var(--acc)":"var(--mut)"}">${NOMS_MOIS[+d.k.slice(5)-1]}${cur?" (en cours)":""}</text>`}).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Produits et charges par mois">${grille}${bars}</svg>`;
+}
+function donut(parts,total){
+  const R=52,C=2*Math.PI*R;let off=0;
+  const arcs=parts.map(([v,coul])=>{const l=v/total*C,s=`<circle r="${R}" cx="70" cy="70" fill="none" stroke="${coul}" stroke-width="18" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`;off+=l;return s}).join("");
+  return `<svg viewBox="0 0 140 140" width="170" height="170" role="img" aria-label="Répartition de la trésorerie"><circle r="${R}" cx="70" cy="70" fill="none" stroke="var(--soft)" stroke-width="18"/>${arcs}
+   <text x="70" y="64" text-anchor="middle" font-size="9" font-weight="600" fill="var(--mut)">TOTAL</text><text x="70" y="80" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${fmt(total)}</text></svg>`;
+}
+const COUL_TRESO=["var(--accd)","#5eead4","#8a97a8","#b7791f"];
+
+// Ligne de suivi d'une facture (tableau de bord et page Facturation).
+function ligneFacture(f){
+  const [st,cl]=factStatut(f),n=esc(f.num);
+  return `<div class="li"><span class="tile ${f.payee?"v":enRetard(f)?"r":"g"}">${ico(f.payee?"check":enRetard(f)?"alert":"clock",16)}</span>
+   <div class="grow"><b>${n}</b> <span class="tag ${cl}">${st}</span><div>${esc(f.client)}${f.echeance?" · "+echeanceTexte(f):" · "+dfr(f.date)}</div></div>
+   <div class="amt"><b>${fmt(f.ttc)}</b>${esc(db.params.devise)}</div>
+   ${!f.annulee&&!f.payee?`<button class="btn sm p noprint" onclick="encaisser('${n}')" title="Enregistrer le paiement">${ico("cash",14)}<span class="hm">Encaisser</span></button>`:`<button class="btn sm o noprint" onclick="voirFacture('${n}')" title="Voir la facture">${ico("eye",14)}</button>`}</div>`;
+}
+
+// ---------- Journal : tableau filtré et extrait du grand livre ----------
+function jRendu(){
+  const q=(ui.jq||"").toLowerCase().trim();
+  const list=[...ecrP()].sort((a,b)=>a.date.localeCompare(b.date))
+    .filter(e=>!q||String(e.piece).toLowerCase().includes(q)||e.libelle.toLowerCase().includes(q)||e.lignes.some(l=>l.compte.startsWith(q)||nom(l.compte).toLowerCase().includes(q)));
+  const L=list.flatMap(e=>e.lignes),td=Moteur.enUnites(Moteur.somme(L,"debit")),tc=Moteur.enUnites(Moteur.somme(L,"credit"));
+  const rows=list.map(e=>e.lignes.map((l,i)=>`<tr${i?"":' style="border-top:2px solid var(--line)"'}><td style="white-space:nowrap">${i?"":dfr(e.date)}</td><td>${i||!e.piece?"":`<span class="pc">${esc(e.piece)}</span>`}</td><td>${i?"":`<b style="font-weight:600">${esc(e.libelle)}</b>`}</td>
+   <td><button class="${cptCls(l.compte)}" onclick="jSel('${esc(l.compte)}')" title="Voir l'extrait du grand livre">${esc(l.compte)}</button></td><td>${pastille(l.compte)}${esc(nom(l.compte))}</td><td class="n deb">${l.debit?fmt(l.debit):""}</td><td class="n cre">${l.credit?fmt(l.credit):""}</td>
+   <td class="noprint" style="white-space:nowrap">${i?"":`<button class="btn x" title="Modifier" onclick="modifier('${e.id}')">${ico("edit",16)}</button><button class="btn x" title="Supprimer" onclick="supprimer('${e.id}')">${ico("trash",16)}</button>`}</td></tr>`).join("")).join("");
+  $("jt").innerHTML=tableau(`<th>Date</th><th>N° pièce</th><th>Libellé de l'opération</th><th>Compte</th><th>Intitulé SYSCOHADA</th><th class="n">Débit</th><th class="n">Crédit</th><th class="noprint"></th>`,
+    rows&&rows+`<tr class="tot"><th colspan=5>Totaux ${q?"de la recherche":"de la période"} (${list.length} écriture(s))</th><th class="n">${fmt(td)}</th><th class="n">${fmt(tc)}</th><th class="noprint"></th></tr>`,q?"Aucune écriture ne correspond à cette recherche.":"Aucune écriture sur cette période.");
+  $("jn").textContent=`${list.length} écriture(s) affichée(s)`;
+  jPanneau();
+}
+function jSel(c){ui.gl=c;saveUi();jPanneau();if(innerWidth<1100)$("jgl").scrollIntoView({behavior:"smooth"})}
+function jPanneau(){
+  const utilises=[...new Set(db.ecritures.flatMap(e=>e.lignes.map(l=>l.compte)))].sort(),el=$("jgl");
+  if(!utilises.length){el.innerHTML=`<h2>${ico("ledger",18)} Extrait du grand livre</h2><p class="mut">Aucune écriture pour le moment.</p>`;return}
+  if(!utilises.includes(ui.gl))ui.gl=utilises.includes("571")?"571":utilises[0];
+  const c=ui.gl,g=Moteur.grandLivre(db.ecritures,c,ui.du,ui.au),dv=esc(db.params.devise),sc=v=>v>=0.005?"Débiteur":v<=-0.005?"Créditeur":"Soldé";
+  el.innerHTML=`<h2 style="margin-bottom:2px">${ico("ledger",18)} Extrait du grand livre</h2><div class="mic" style="margin-bottom:12px">Cliquez sur un compte du journal</div>
+   <select onchange="jSel(this.value)" aria-label="Compte">${utilises.map(x=>`<option value="${esc(x)}"${x===c?" selected":""}>${esc(x)} – ${esc(nom(x))}</option>`).join("")}</select>
+   <div class="mut" style="font-size:12px;margin-top:6px">Classe ${classe(c)} · ${CLASSES[classe(c)]||""}</div>
+   <div class="tiles2"><div><span class="mic">Solde d'ouverture</span><b>${fmt(Math.abs(g.ouverture))} <small class="mut">${dv}</small></b><span class="mut" style="font-size:11.5px">${sc(g.ouverture)}${ui.du?" au "+dfr(ui.du):""}</span></div>
+    <div><span class="mic">Solde de clôture</span><b class="${g.cloture<0?"deb":"cre"}">${fmt(Math.abs(g.cloture))} <small class="mut">${dv}</small></b><span class="mut" style="font-size:11.5px">${sc(g.cloture)}${ui.au?" au "+dfr(ui.au):""}</span></div></div>
+   <div class="head" style="margin:4px 0 8px"><b style="margin-right:auto;font-size:13px">Mouvements de la période</b><span class="mut" style="font-size:12px">${g.mouvements.length} opération(s)</span></div>
+   ${g.mouvements.slice(-5).reverse().map(({e,l,solde})=>`<div class="mv"><div class="r"><span class="mut">${dfr(e.date)}${e.piece?" · "+esc(e.piece):""}</span><span class="tag ${l.debit?"bad":"ok"}">${l.debit?"Débit":"Crédit"}</span></div>
+     <div style="font-weight:600;margin:2px 0">${esc(e.libelle)}</div><div class="r"><span>Mvt : <b class="${l.debit?"deb":"cre"}">${l.debit?"+"+fmt(l.debit):"−"+fmt(l.credit)}</b></span><span class="mut num">Solde : ${fmt(solde)}</span></div></div>`).join("")||'<p class="mut">Aucun mouvement sur la période.</p>'}
+   ${g.mouvements.length>5?`<p class="mut" style="font-size:12px">… et ${g.mouvements.length-5} mouvement(s) plus ancien(s).</p>`:""}
+   <div class="pro" style="margin:10px 0"><div class="tt"><span>Total débit</span><b class="deb">${fmt(g.td)} ${dv}</b></div><div class="tt"><span>Total crédit</span><b class="cre">${fmt(g.tc)} ${dv}</b></div>
+    <div class="tt" style="border-top:1px solid var(--line);margin-top:4px;padding-top:8px"><b>Solde net de la période</b><b>${fmt(arr(g.td-g.tc))} ${dv}</b></div></div>
+   <button class="btn w" onclick="go('grandlivre')">${ico("file",16)} Fiche complète du compte</button>`;
+}
+
+// ---------- Saisie simplifiée : dépense, recette ou virement interne ----------
+let qNat="dep";
+const radio=n=>(document.querySelector(`input[name="${n}"]:checked`)||{}).value;
+function qNature(n){qNat=n;qType()}
+function qLignes(){
+  const m=arr(parseFloat($("qm").value)||0),t=radio("qp"),c=$("qc").value;
+  if(qNat==="vir"){const v=radio("qv");return {m,L:[{compte:v,debit:m,credit:0},{compte:t,debit:0,credit:m}]}}
+  return {m,L:qNat==="dep"?[{compte:c,debit:m,credit:0},{compte:t,debit:0,credit:m}]:[{compte:t,debit:m,credit:0},{compte:c,debit:0,credit:m}]};
+}
+function qSim(){
+  const {m,L}=qLignes(),dv=esc(db.params.devise);
+  if(m<=0){$("qsim").innerHTML=`<div class="mic">Aperçu de l'écriture SYSCOHADA</div><p class="mut" style="margin:6px 0 0">Saisissez un montant : l'écriture générée s'affiche ici avant validation.</p>`;return}
+  const ok=Moteur.equilibree(L)&&L[0].compte!==L[1].compte;
+  $("qsim").innerHTML=`<div class="head" style="margin-bottom:6px"><span class="mic" style="margin-right:auto">Aperçu de l'écriture SYSCOHADA</span><span class="tag ${ok?"ok":"bad"}">${ok?"✔ Écriture équilibrée":"Écriture incorrecte"}</span></div>
+   <table><tr><th>Compte</th><th>Intitulé</th><th class="n">Débit (${dv})</th><th class="n">Crédit (${dv})</th></tr>
+   ${L.map(l=>`<tr><td><span class="${cptCls(l.compte)}">${esc(l.compte)}</span></td><td>${esc(nom(l.compte))}</td><td class="n deb">${l.debit?fmt(l.debit):"–"}</td><td class="n cre">${l.credit?fmt(l.credit):"–"}</td></tr>`).join("")}</table>`;
+}
+
 // ---------- Vues ----------
 const views={
 dashboard(){
-  const r=resultat(),s=soldes(ecrJusquAu());
-  const tres=TRESO.reduce((a,[c])=>a+sd(s,c),0);
+  const r=resultat(),s=soldes(ecrJusquAu()),dv=esc(db.params.devise);
+  const tresos=TRESO.map(([c,n],i)=>({c,n,v:sd(s,c),coul:COUL_TRESO[i]}));
+  const tres=arr(tresos.reduce((a,x)=>a+x.v,0));
   const impayees=db.factures.filter(f=>!f.annulee&&!f.payee);
-  const reste=impayees.reduce((a,f)=>a+f.ttc,0);
+  const reste=Moteur.enUnites(Moteur.somme(impayees,"ttc")),retard=impayees.filter(enRetard);
   const recent=[...db.ecritures].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
-  const dv=esc(db.params.devise);
-  const negs=TRESO.filter(([c])=>sd(s,c)<=-0.005);
-  return `${negs.length?`<div class="msg bad">⚠️ Solde négatif : ${negs.map(([c,n])=>`<b>${n}</b> ${fmt(sd(s,c))} ${dv}`).join(", ")}. Il manque probablement une recette, un apport ou un virement.</div>`:""}${db.ecritures.length?"":`<div class="card"><h2>Bienvenue 👋</h2><p class="mut">Commencez par renseigner votre entreprise dans <b>Paramètres</b>, puis enregistrez vos dépenses et recettes dans <b>Saisie</b>. Vous pouvez aussi essayer avec des données de démonstration.</p>
-   <div class="bar"><button class="btn p" onclick="go('saisie')">➕ Première saisie</button><button class="btn" onclick="demo()">Charger une démo</button><button class="btn" onclick="go('parametres')">⚙️ Paramètres</button></div></div>`}
+  const negs=tresos.filter(x=>x.v<=-0.005),bal=Moteur.balance(db.ecritures),mois=parMois(6);
+  const cumul=mois.reduce((a,d)=>a+d.p-d.c,0),positifs=tresos.filter(x=>x.v>0.005),totPos=positifs.reduce((a,x)=>a+x.v,0);
+  const suivi=[...db.factures].filter(f=>!f.annulee).sort((a,b)=>(!!a.payee-!!b.payee)||String(a.echeance||a.date).localeCompare(String(b.echeance||b.date))).slice(0,5);
+  return `<div class="card status">
+    <span class="tile ${bal.equilibre?"v":"r"}">${ico(bal.equilibre?"check":"alert",18)}</span>
+    <b>${libPeriode()[0].toUpperCase()+libPeriode().slice(1)}</b>
+    <span class="${bal.equilibre?"cre":"deb"}" style="font-weight:600">${bal.equilibre?"Toutes les écritures sont équilibrées (débit = crédit)":"Écritures déséquilibrées : vérifiez le journal"}</span>
+    <span class="tag acc">SYSCOHADA révisé</span><span class="sp"></span>
+    <span class="mut">${db.ecritures.length} écriture(s) · ${db.factures.length} facture(s)</span></div>
+  ${negs.length?`<div class="msg bad">${ico("alert",18)}<span>Solde négatif : ${negs.map(x=>`<b>${x.n}</b> ${fmt(x.v)} ${dv}`).join(", ")}. Il manque probablement une recette, un apport ou un virement.</span></div>`:""}
+  ${retard.length?`<div class="msg warn">${ico("clock",18)}<span><b>${retard.length} facture(s) en retard de paiement</b> pour ${money(Moteur.enUnites(Moteur.somme(retard,"ttc")))}. <a href="#" onclick="go('factures');return false">Voir les factures</a></span></div>`:""}
+  ${db.ecritures.length?"":`<div class="card"><h2>Bienvenue</h2><p class="mut">Commencez par renseigner votre entreprise dans <b>Paramètres</b>, puis enregistrez vos dépenses et recettes dans <b>Saisie comptable</b>. Vous pouvez aussi essayer avec des données de démonstration.</p>
+   <div class="bar"><button class="btn p" onclick="go('saisie')">${ico("plus",16)} Première saisie</button><button class="btn" onclick="demo()">Charger une démo</button><button class="btn o" onclick="go('parametres')">${ico("gear",16)} Paramètres</button></div></div>`}
   <div class="grid">
-   <div class="card kpi" style="--c:var(--ok)"><span>Produits (recettes)</span><b>${fmt(r.prod)}</b><em>${dv} · ${libPeriode()}</em></div>
-   <div class="card kpi" style="--c:var(--bad)"><span>Charges (dépenses)</span><b>${fmt(r.ch)}</b><em>${dv} · ${libPeriode()}</em></div>
-   <div class="card kpi" style="--c:${r.res>=0?'var(--ok)':'var(--bad)'}"><span>Résultat ${r.res>=0?"(bénéfice)":"(perte)"}</span><b style="color:${r.res>=0?'var(--ok)':'var(--bad)'}">${fmt(r.res)}</b><em>${dv}</em></div>
-   <div class="card kpi" style="--c:var(--acc)"><span>Trésorerie disponible</span><b>${fmt(tres)}</b><em>Caisse, banque, Mobile Money</em></div>
-   <div class="card kpi" style="--c:var(--gold)"><span>Factures à encaisser</span><b>${fmt(reste)}</b><em>${impayees.length} facture(s)</em></div>
-   <div class="card kpi" style="--c:var(--mut)"><span>Dettes fournisseurs</span><b>${fmt(-sd(s,"401"))}</b><em>${dv}</em></div>
+   <div class="card kpi" style="--c:var(--ok)"><div class="lt"><span class="mic">Produits (classe 7)</span>${ico("chart",16)}</div><div class="v">${fmt(r.prod)}${unite()}</div><div class="d">${libPeriode()}</div>${courbe(mois.map(d=>d.p),"var(--ok)")}</div>
+   <div class="card kpi" style="--c:var(--gold)"><div class="lt"><span class="mic">Charges (classe 6)</span>${ico("cash",16)}</div><div class="v">${fmt(r.ch)}${unite()}</div><div class="d">${libPeriode()}</div>${courbe(mois.map(d=>d.c),"var(--gold)")}</div>
+   <div class="card kpi" style="--c:${r.res>=0?"var(--ok)":"var(--bad)"}"><div class="lt"><span class="mic">Résultat net</span><span class="tag ${r.res>=0?"ok":"bad"}">${r.res>=0?"Bénéfice":"Perte"}</span></div><div class="v ${r.res>=0?"cre":"deb"}">${r.res>0?"+":""}${fmt(r.res)}${unite()}</div><div class="d">${r.prod>0?`Marge nette : <b>${(r.res/r.prod*100).toFixed(1).replace(".",",")} %</b> des produits`:"Pas encore de produits sur la période"}</div></div>
+   <div class="card kpi" style="--c:var(--acc)"><div class="lt"><span class="mic">Trésorerie disponible</span>${ico("wallet",16)}</div><div class="v">${fmt(tres)}${unite()}</div>
+    ${tresos.filter(x=>Math.abs(x.v)>=0.005).map(x=>`<div class="kl"><span>${x.n} (${x.c})</span><b class="${x.v<0?"deb":""}">${fmt(x.v)}</b></div>`).join("")||'<div class="d">Classe 5 : caisse, banque, Mobile Money</div>'}</div>
+   <div class="card kpi" style="--c:var(--secink)"><div class="lt"><span class="mic">Créances clients</span>${ico("receipt",16)}</div><div class="v">${fmt(reste)}${unite()}</div>
+    <div class="d"><b class="${retard.length?"deb":""}">${impayees.length} facture(s) en attente${retard.length?`, dont ${retard.length} en retard`:""}</b></div>
+    <div class="kl"><span>Dettes fournisseurs (401)</span><b>${fmt(-sd(s,"401"))}</b></div></div>
   </div>
-  <div class="cols">
-   <div class="card"><div class="head"><h2>Recettes et dépenses (6 derniers mois)</h2></div>${graphique()}</div>
-   <div class="card"><div class="head"><h2>Dernières écritures</h2><button class="btn sm" onclick="go('journal')">Tout voir</button></div>
-    ${recent.length?`<div class="tw"><table>${recent.map(e=>{const m=e.lignes.reduce((a,l)=>a+(l.debit||0),0);return `<tr><td class="mut" style="white-space:nowrap">${dfr(e.date)}</td><td>${esc(e.libelle)}</td><td class="n">${fmt(m)}</td></tr>`}).join("")}</table></div>`:'<p class="mut">Aucune écriture pour le moment.</p>'}</div>
+  <div class="c2">
+   <div class="card"><div class="head"><div style="margin-right:auto"><h2 style="margin:0">Évolution des produits et des charges</h2><div class="mut">6 derniers mois · compte de résultat</div></div>
+     <div class="legend"><span><i style="background:var(--accd)"></i>Produits (70-75)</span><span><i style="background:var(--bar2)"></i>Charges (60-68)</span></div></div>
+    ${graphique()}
+    <div class="foot"><span>${ico("chart",16)} Résultat cumulé sur 6 mois : <b class="${cumul>=0?"cre":"deb"}">${cumul>0?"+":""}${money(cumul)}</b></span><a href="#" onclick="go('etats');return false">Voir le compte de résultat ${ico("arrow",14)}</a></div></div>
+   <div class="card"><div class="head"><h2>Canaux de trésorerie</h2><span class="mic">Classe 5</span></div>
+    <p class="sub" style="margin-top:-8px">Caisse, banque et Mobile Money au ${dfr(ui.au)||dfr(today())}.</p>
+    ${totPos>0?`<div style="display:grid;place-items:center;margin-bottom:10px">${donut(positifs.map(x=>[x.v,x.coul]),totPos)}</div>
+     ${tresos.filter(x=>Math.abs(x.v)>=0.005).map(x=>`<div class="li" style="background:none;padding:6px 0;margin:0"><span class="dot" style="background:${x.coul};width:10px;height:10px"></span><div class="grow"><b>${x.c} · ${x.n}</b></div><div class="amt"><b class="${x.v<0?"deb":""}">${fmt(x.v)}</b>${x.v>0?(x.v/totPos*100).toFixed(1).replace(".",",")+" %":"négatif"}</div></div>`).join("")}`
+     :`<p class="mut">Aucun solde de trésorerie positif pour l'instant.</p>`}</div>
+  </div>
+  <div class="c2">
+   <div class="card"><div class="head"><h2>${ico("book",18)} Dernières écritures au journal</h2><a href="#" onclick="go('journal');return false">Voir tout le journal ${ico("arrow",14)}</a></div>
+    ${recent.length?tableau(`<th>Date et pièce</th><th>Libellé de l'opération</th><th class="hm">Comptes</th><th class="n">Montant</th>`,
+      recent.map(e=>`<tr><td style="white-space:nowrap">${dfr(e.date)}<br>${e.piece?`<span class="pc">${esc(e.piece)}</span>`:""}</td><td>${esc(e.libelle)}</td><td class="hm">${e.lignes.slice(0,3).map(l=>`<span class="${cptCls(l.compte)}">${esc(l.compte)}</span>`).join(" · ")}</td><td class="n"><b>${fmt(Moteur.enUnites(Moteur.somme(e.lignes,"debit")))}</b></td></tr>`).join(""),""):'<p class="mut">Aucune écriture pour le moment.</p>'}</div>
+   <div class="card"><div class="head"><h2>${ico("receipt",18)} Factures et échéances</h2>${reste?`<span class="tag warn">${fmt(reste)} ${dv} en attente</span>`:""}</div>
+    ${suivi.map(ligneFacture).join("")||'<p class="mut">Aucune facture. <a href="#" onclick="go(\'factures\');return false">Créer une facture</a></p>'}</div>
   </div>`;
 },
 saisie(){
   const ed=edition?db.ecritures.find(e=>e.id===edition):null;
   if(!ed)edition=null;
-  const mode=ed?"avancee":ui.mode;
-  return `<div class="tabs noprint"><button class="${mode!=="avancee"?"on":""}" onclick="ui.mode='simple';edition=null;saveUi();go('saisie')">Saisie simplifiée</button><button class="${mode==="avancee"?"on":""}" onclick="ui.mode='avancee';saveUi();go('saisie')">Saisie avancée (débit / crédit)</button></div>
-  ${mode!=="avancee"?`<div class="card"><h2>Enregistrer une dépense ou une recette</h2>
-   <p class="mut" style="margin-top:-6px">Pas besoin de connaître la comptabilité : l'assistant choisit les comptes pour vous.</p>
-   <div class="f">
-    <div><label>Type</label><select id="qt" onchange="qType()"><option value="dep">💸 Dépense (je paie)</option><option value="rec">💰 Recette (j'encaisse)</option></select></div>
-    <div><label>Date</label><input type="date" id="qd" value="${today()}"></div>
-    <div class="w2"><label>Libellé</label><input id="ql" placeholder="Ex : Loyer octobre, crédit téléphone, vente…" oninput="qAide()"></div>
-    <div><label>Montant (${esc(db.params.devise)})</label><input id="qm" type="number" min="0" step="0.01"></div>
-    <div><label>Payé / encaissé par</label><select id="qp">${optionsTreso("571")}</select></div>
-    <div class="w2"><label>Compte (choisi automatiquement, modifiable)</label><select id="qc" onchange="this.dataset.manuel='1';qAide()"></select></div>
-    <div><label>N° pièce (facultatif)</label><input id="qn" placeholder="Reçu, ticket…"></div>
-   </div>
-   <div id="qaide"></div>
-   <button class="btn p" onclick="qValider()">Enregistrer</button><div id="qres"></div></div>`
-  :`<div class="card"><h2>${ed?"Modifier l'écriture":"Nouvelle écriture"}</h2>
+  const mode=ed?"avancee":ui.mode,dv=esc(db.params.devise);
+  const s=soldes(db.ecritures),recent=[...db.ecritures].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  const opts=(name,sel)=>`<div class="opts">${TRESO.map(([c,n])=>`<label class="opt"><input type="radio" name="${name}" value="${c}"${c===sel?" checked":""} onchange="qSim()"><span><b>${n}</b><em>Solde : ${fmt(sd(s,c))}</em></span><code>${c}</code></label>`).join("")}</div>`;
+  return `<div class="card"><div class="phead"><div class="ptile"><span class="tile">${ico("spark",22)}</span><div><h1>Saisie comptable <span class="tag acc" style="vertical-align:4px">Assistant SYSCOHADA</span></h1><p>Imputation automatique selon le plan SYSCOHADA révisé · montants en ${dv}</p></div></div>
+   <div class="tabs noprint"><button class="${mode!=="avancee"?"on":""}" onclick="ui.mode='simple';edition=null;saveUi();go('saisie')">${ico("spark",16)} Saisie simplifiée</button><button class="${mode==="avancee"?"on":""}" onclick="ui.mode='avancee';saveUi();go('saisie')">${ico("scale",16)} Saisie avancée (débit / crédit)</button></div></div></div>
+  ${mode!=="avancee"?`<div class="c2"><div class="card">
+   <div class="head" style="margin-bottom:8px"><label style="margin:0;margin-right:auto">Nature de l'opération</label><span class="mic" style="color:var(--acc)">Contrôle de l'écriture en temps réel</span></div>
+   <div class="nat" id="qnat">
+    <button class="dep" onclick="qNature('dep')">${ico("up",16)} Dépense</button>
+    <button class="rec" onclick="qNature('rec')">${ico("down",16)} Recette</button>
+    <button class="vir" onclick="qNature('vir')">${ico("swap",16)} Virement interne</button></div>
+   <div style="margin-bottom:14px"><label for="ql">Libellé de l'opération</label><input id="ql" placeholder="Ex : Loyer octobre, crédit téléphone, vente…" oninput="qAide()"><div id="qaide"></div></div>
+   <div id="qcb" style="margin-bottom:14px"><label for="qc">Compte d'imputation <span class="mut" style="font-weight:400">(choisi automatiquement, modifiable)</span></label><select id="qc" onchange="this.dataset.manuel='1';qAide()"></select></div>
+   <div class="f"><div><label for="qd">Date de l'opération</label><input type="date" id="qd" value="${today()}" oninput="qSim()"></div>
+    <div><label for="qm">Montant</label><div class="money"><input id="qm" class="big" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" oninput="qSim()"><em>${dv}</em></div></div></div>
+   <label id="qpl">Payé par</label>${opts("qp","571")}
+   <div id="qvb" class="hide"><label>Vers</label>${opts("qv","521")}</div>
+   <div class="f"><div><label for="qn">N° de pièce justificative <span class="mut" style="font-weight:400">(facultatif)</span></label><input id="qn" placeholder="Reçu, ticket, facture…" oninput="qSim()"></div></div>
+   <div class="sim" id="qsim"></div>
+   <div class="bar"><button class="btn o" onclick="go('saisie')">Effacer la saisie</button><span class="sp"></span><button class="btn p" onclick="qValider()">${ico("check",16)} Valider au journal</button></div>
+   <div id="qres"></div></div>
+   <div><div class="card"><h2>${ico("wallet",18)} Soldes de trésorerie</h2>
+     ${TRESO.map(([c,n])=>`<div class="li"><span class="tile">${ico(c==="571"?"cash":c==="552"?"wallet":"bank",16)}</span><div class="grow"><b>${n}</b><div>Compte ${c}</div></div><div class="amt"><b class="${sd(s,c)<0?"deb":""}">${fmt(sd(s,c))}</b>${dv}</div></div>`).join("")}</div>
+    <div class="card"><div class="head"><h2>Dernières saisies</h2><a href="#" onclick="go('journal');return false">Journal ${ico("arrow",14)}</a></div>
+     ${recent.map(e=>`<div class="mv"><div class="r"><span class="mut">${dfr(e.date)}${e.piece?" · "+esc(e.piece):""}</span><b>${fmt(Moteur.enUnites(Moteur.somme(e.lignes,"debit")))}</b></div>${esc(e.libelle)}</div>`).join("")||'<p class="mut">Aucune saisie pour le moment.</p>'}</div></div></div>`
+  :`<div class="card"><h2>${ed?"Modifier l'écriture":"Nouvelle écriture en partie double"}</h2>
    <div class="row" style="grid-template-columns:1fr 1fr 2fr">
-    <input type="date" id="dt" value="${ed?esc(ed.date):today()}"><input id="pc" placeholder="N° pièce" value="${ed?esc(ed.piece):""}">
+    <input type="date" id="dt" value="${ed?esc(ed.date):today()}" aria-label="Date"><input id="pc" placeholder="N° pièce" value="${ed?esc(ed.piece):""}">
     <input id="lib" placeholder="Libellé (ex : Loyer octobre)" oninput="aide()" value="${ed?esc(ed.libelle):""}"></div>
-   <div id="aide"></div>
+   <div id="aide" style="margin-bottom:10px"></div>
+   <div class="row mic" style="margin:8px 0 4px"><span>Compte</span><span>Débit</span><span>Crédit</span><span style="width:34px"></span></div>
    <div id="lignes"></div>
-   <button class="btn sm" onclick="addLigne()">+ Ligne</button>
-   <div id="tot" class="mut" style="margin:10px 0"></div>
-   <div class="bar"><button class="btn p" onclick="valider()">${ed?"Enregistrer les modifications":"Enregistrer"}</button>${ed?`<button class="btn" onclick="edition=null;go('journal')">Annuler</button>`:""}</div><div id="res"></div></div>
+   <button class="btn sm" onclick="addLigne()">${ico("plus",14)} Ligne</button>
+   <div id="tot" class="foot"></div>
+   <div class="bar" style="margin-top:14px"><button class="btn p" onclick="valider()">${ico("check",16)} ${ed?"Enregistrer les modifications":"Valider au journal"}</button>${ed?`<button class="btn o" onclick="edition=null;go('journal')">Annuler</button>`:""}</div><div id="res"></div></div>
    <datalist id="plan">${comptes().map(p=>`<option value="${p[0]}">${esc(p[1])}</option>`).join("")}</datalist>`}`;
 },
 journal(){
-  const list=[...ecrP()].sort((a,b)=>a.date.localeCompare(b.date));
-  const lignes=list.flatMap(e=>e.lignes),td=Moteur.enUnites(Moteur.somme(lignes,"debit")),tc=Moteur.enUnites(Moteur.somme(lignes,"credit"));
-  const rows=list.map(e=>e.lignes.map((l,i)=>{return `<tr><td>${i?"":dfr(e.date)}</td><td>${i?"":esc(e.piece)}</td><td>${i?"":esc(e.libelle)}</td><td>${esc(l.compte)} <span class="mut">${esc(nom(l.compte))}</span></td><td class="n">${l.debit?fmt(l.debit):""}</td><td class="n">${l.credit?fmt(l.credit):""}</td><td class="noprint" style="white-space:nowrap">${i?"":`<button class="btn x" title="Modifier" onclick="modifier('${e.id}')">✏️</button><button class="btn x" title="Supprimer" onclick="supprimer('${e.id}')">🗑</button>`}</td></tr>`}).join("")).join("");
-  return `<div class="card">${printhead("Journal")}<div class="head"><h2>Journal <span class="tag">${list.length} écriture(s)</span></h2>
-   <button class="btn sm" onclick="exportJournal()">⬇ Excel (CSV)</button><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div>
-   ${tableau(`<th>Date</th><th>Pièce</th><th>Libellé</th><th>Compte</th><th class="n">Débit</th><th class="n">Crédit</th><th class="noprint"></th>`,
-    rows&&rows+`<tr class="tot"><th colspan=4>Totaux</th><th class="n">${fmt(td)}</th><th class="n">${fmt(tc)}</th><th class="noprint"></th></tr>`,"Aucune écriture sur cette période.")}</div>`;
+  const list=ecrP(),lignes=list.flatMap(e=>e.lignes);
+  const d=Moteur.somme(lignes,"debit"),c=Moteur.somme(lignes,"credit"),u=Moteur.enUnites,dv=esc(db.params.devise);
+  return `<div class="phead" style="margin-bottom:16px"><div><span class="tag acc">SYSCOHADA révisé</span> <span class="mut">${esc(db.params.societe)} · ${libPeriode()}</span>
+    <h1 style="margin-top:6px">Journal général <span class="mut" style="font:400 13px var(--ff)">(écritures chronologiques)</span></h1></div>
+   <div class="bar noprint"><button class="btn o" onclick="exportJournal()">${ico("download",16)} Export CSV</button><button class="btn o" onclick="print()">${ico("print",16)} Imprimer / PDF</button><button class="btn p" onclick="go('grandlivre')">${ico("ledger",16)} Grand livre</button></div></div>
+  <div class="totbar"><span class="mic">Total débit</span><b class="deb">${fmt(u(d))} <small>${dv}</small></b><span class="mic">Total crédit</span><b class="cre">${fmt(u(c))} <small>${dv}</small></b>
+   <span class="mic">Écart</span><b>${fmt(u(d-c))}</b><span class="sp"></span><span class="tag ${d===c?"ok":"bad"}">${d===c?"Journal équilibré ✔":"Journal déséquilibré"}</span></div>
+  <div class="card noprint" style="padding:12px"><div class="bar"><div class="money" style="flex:1;min-width:220px"><input id="jq" placeholder="Rechercher : n° de pièce, libellé ou compte" value="${esc(ui.jq||"")}" oninput="ui.jq=this.value;saveUi();jRendu()"><em>${ico("search",16)}</em></div><span class="mut" id="jn"></span></div></div>
+  <div class="c2"><div class="card" style="padding:0;overflow:hidden">${printhead("Journal")}<div id="jt"></div></div><div class="card noprint" id="jgl"></div></div>`;
+},
+factures(){
+  const clients=[...new Set(db.factures.map(f=>f.client).filter(Boolean))].sort();
+  const liste=[...db.factures].reverse();
+  const rows=liste.map(f=>{const [st,cl]=factStatut(f);const n=esc(f.num);return `<tr><td><span class="pc">${n}</span></td><td>${dfr(f.date)}</td><td>${f.echeance?dfr(f.echeance):'<span class="mut">—</span>'}</td><td>${esc(f.client)}${f.objet?`<br><span class="mut">${esc(f.objet)}</span>`:""}</td><td class="n">${fmt(f.ht)}</td><td class="n">${fmt(f.tva)}</td><td class="n"><b>${fmt(f.ttc)}</b></td><td><span class="tag ${cl}">${st}</span></td>
+   <td class="noprint" style="white-space:nowrap"><button class="btn sm o" onclick="voirFacture('${n}')">${ico("eye",14)} Voir</button>${!f.annulee&&!f.payee?` <button class="btn sm p" onclick="encaisser('${n}')">${ico("cash",14)} Encaisser</button>`:""}</td></tr>`}).join("");
+  return `<div class="c2"><div class="card">
+   <div class="head"><h2 style="display:flex;gap:10px;align-items:center"><span class="tile" style="width:36px;height:36px">${ico("receipt",18)}</span>Nouvelle facture client</h2><span class="tag">N° ${prochainNum()}</span></div>
+   <div class="f"><div class="w2"><label for="fc">Client (compte 411)</label><input id="fc" list="clients" placeholder="Nom du client" oninput="apercuFacture()"><datalist id="clients">${clients.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
+    <div><label for="fd">Date</label><input id="fd" type="date" value="${today()}" oninput="apercuFacture()"></div>
+    <div><label for="fe">Échéance <span class="mut" style="font-weight:400">(facultatif)</span></label><input id="fe" type="date" oninput="apercuFacture()"></div></div>
+   <div class="head" style="margin-bottom:8px"><label style="margin:0;margin-right:auto">Lignes de prestations ou de marchandises</label><button class="btn sm" onclick="fLigne();apercuFacture()">${ico("plus",14)} Ajouter une ligne</button></div>
+   <div class="inl mic" style="margin-bottom:4px"><span>Désignation</span><span>Qté</span><span>Prix unitaire</span><span class="hm" style="text-align:right">Montant HT</span><span></span></div>
+   <div id="flignes"></div>
+   <div class="f" style="margin-top:12px"><div><label for="fk">Type de vente</label><select id="fk"><option value="706">Services vendus (706)</option><option value="701">Ventes de marchandises (701)</option><option value="702">Produits finis (702)</option></select></div>
+    <div><label for="ft">TVA (%)</label><input id="ft" type="number" min="0" max="100" step="0.01" value="${esc(db.params.tva)}" oninput="apercuFacture()"></div></div>
+   <div id="fap"></div>
+   <button class="btn p w" onclick="facturer()">${ico("check",16)} Émettre et comptabiliser</button><div id="fres"></div></div>
+   <div class="card"><div class="head"><h2>Suivi des factures</h2><span class="mic">${db.factures.length} au total</span></div>
+    ${liste.filter(f=>!f.annulee).slice(0,8).map(ligneFacture).join("")||'<p class="mut">Aucune facture pour le moment.</p>'}</div></div>
+  <div class="card"><div class="head"><h2>Toutes les factures</h2><button class="btn sm o" onclick="exportFactures()">${ico("download",14)} Export CSV</button></div>${tableau(`<th>N°</th><th>Date</th><th>Échéance</th><th>Client</th><th class="n">HT</th><th class="n">TVA</th><th class="n">TTC</th><th>Statut</th><th class="noprint"></th>`,rows,"Aucune facture.")}</div>`;
 },
 grandlivre(){
   const utilises=[...new Set(db.ecritures.flatMap(e=>e.lignes.map(l=>l.compte)))].sort();
@@ -508,7 +811,7 @@ grandlivre(){
    return `<tr><td>${dfr(e.date)}</td><td>${esc(e.piece)}</td><td>${esc(e.libelle)}</td><td class="n">${l.debit?fmt(l.debit):""}</td><td class="n">${l.credit?fmt(l.credit):""}</td><td class="n">${fmt(Math.abs(solde))} ${sens(solde)}</td></tr>`}).join("");
   return `<div class="card">${printhead("Grand livre "+esc(c+" "+nom(c)))}<div class="head"><h2>Grand livre</h2>
    <select style="width:auto;max-width:100%" class="noprint" onchange="ui.gl=this.value;saveUi();go('grandlivre')">${utilises.map(x=>`<option value="${esc(x)}"${x===c?" selected":""}>${esc(x)} – ${esc(nom(x))}</option>`).join("")}</select>
-   <button class="btn sm" onclick="exportGL()">⬇ Excel (CSV)</button><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div>
+   <button class="btn sm o" onclick="exportGL()">${ico("download",14)} Export CSV</button><button class="btn sm o" onclick="print()">${ico("print",14)} Imprimer / PDF</button></div>
    ${tableau(`<th>Date</th><th>Pièce</th><th>Libellé</th><th class="n">Débit</th><th class="n">Crédit</th><th class="n">Solde</th>`,
     (ui.du?`<tr><td colspan=5 class="mut">Solde reporté au ${dfr(ui.du)}</td><td class="n">${fmt(Math.abs(ouverture))} ${sens(ouverture)}</td></tr>`:"")+rows+
     `<tr class="tot"><th colspan=3>Totaux de la période</th><th class="n">${fmt(td)}</th><th class="n">${fmt(tc)}</th><th class="n">${fmt(Math.abs(solde))} ${sens(solde)}</th></tr>`,"")}</div>`;
@@ -519,7 +822,7 @@ balance(){
    return `<tr><td><a href="#" onclick="ui.gl=this.textContent;go('grandlivre');return false" title="Voir le grand livre">${esc(c)}</a></td><td>${esc(nom(c))}</td><td class="n">${fmt(v.d)}</td><td class="n">${fmt(v.c)}</td><td class="n">${x>=0.005?fmt(x):""}</td><td class="n">${x<=-0.005?fmt(-x):""}</td></tr>`}).join("");
   const eq=b.equilibre;
   return `<div class="card">${printhead("Balance générale")}<div class="head"><h2>Balance générale</h2>
-   <button class="btn sm" onclick="exportBalance()">⬇ Excel (CSV)</button><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div>
+   <button class="btn sm o" onclick="exportBalance()">${ico("download",14)} Export CSV</button><button class="btn sm o" onclick="print()">${ico("print",14)} Imprimer / PDF</button></div>
    ${tableau(`<th>Compte</th><th>Intitulé</th><th class="n">Débit</th><th class="n">Crédit</th><th class="n">Solde D</th><th class="n">Solde C</th>`,
     rows&&rows+`<tr class="tot"><th></th><th>Totaux</th><th class="n">${fmt(td)}</th><th class="n">${fmt(tc)}</th><th></th><th></th></tr>`,"Aucune écriture sur cette période.")}
    <div class="msg ${eq?'ok':'bad'}">${eq?'Balance équilibrée ✔':'Balance déséquilibrée'}</div></div>`;
@@ -528,7 +831,7 @@ etats(){
   const s=soldes(),r=resultat();
   const sec=(k,sn)=>Object.keys(s).filter(c=>classe(c)===k).sort().map(c=>{const v=s[c];const m=sn==="d"?v.d-v.c:v.c-v.d;return `<tr><td>${esc(c)} ${esc(nom(c))}</td><td class="n">${fmt(m)}</td></tr>`}).join("");
   const h=sec("8","c");
-  return `<div class="card">${printhead("Compte de résultat")}<div class="head"><h2>Compte de résultat</h2><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div><div class="tw"><table>
+  return `<div class="card">${printhead("Compte de résultat")}<div class="head"><h2>Compte de résultat</h2><button class="btn sm o" onclick="print()">${ico("print",14)} Imprimer / PDF</button></div><div class="tw"><table>
    <tr><th colspan=2>Produits (classe 7)</th></tr>${sec("7","c")||'<tr><td colspan=2 class="mut">—</td></tr>'}
    <tr class="tot"><th>Total produits</th><th class="n">${fmt(r.prod)}</th></tr>
    <tr><th colspan=2>Charges (classe 6)</th></tr>${sec("6","d")||'<tr><td colspan=2 class="mut">—</td></tr>'}
@@ -540,7 +843,7 @@ bilan(){
   const b=bilan(),dt=dfr(ui.au)||dfr(today());
   const lig=L=>L.map(([c,v])=>`<tr><td>${esc(c)} ${esc(nom(c))}</td><td class="n">${fmt(v)}</td></tr>`).join("");
   const eq=b.equilibre;
-  return `<div class="card">${printhead("Bilan au "+dt)}<div class="head"><h2>Bilan simplifié au ${dt}</h2><button class="btn sm" onclick="print()">🖨 Imprimer / PDF</button></div><div class="cols">
+  return `<div class="card">${printhead("Bilan au "+dt)}<div class="head"><h2>Bilan simplifié au ${dt}</h2><button class="btn sm o" onclick="print()">${ico("print",14)} Imprimer / PDF</button></div><div class="cols">
    <div class="tw"><table><tr><th colspan=2>Actif (ce que l'entreprise possède)</th></tr>${lig(b.actif)||'<tr><td colspan=2 class="mut">—</td></tr>'}
     <tr class="tot"><th>Total actif</th><th class="n">${fmt(b.ta)}</th></tr></table></div>
    <div class="tw"><table><tr><th colspan=2>Passif (ce que l'entreprise doit)</th></tr>${lig(b.passif)}
@@ -549,28 +852,12 @@ bilan(){
    <div class="msg ${eq?'ok':'bad'}">${eq?'Actif = Passif ✔':'Actif et passif ne sont pas égaux : vérifiez les écritures.'}</div>
    <p class="mut">Bilan indicatif calculé avec toutes les écritures jusqu'à cette date. Il ne remplace pas les états financiers officiels.</p></div>`;
 },
-factures(){
-  const rows=[...db.factures].reverse().map(f=>{const [st,cl]=factStatut(f);const n=esc(f.num);return `<tr><td>${n}</td><td>${dfr(f.date)}</td><td>${esc(f.client)}${f.objet?`<br><span class="mut">${esc(f.objet)}</span>`:""}</td><td class="n">${fmt(f.ht)}</td><td class="n">${fmt(f.tva)}</td><td class="n">${fmt(f.ttc)}</td><td><span class="tag ${cl}">${st}</span></td>
-   <td class="noprint" style="white-space:nowrap"><button class="btn sm" onclick="voirFacture('${n}')">👁 Voir</button>${!f.annulee&&!f.payee?` <button class="btn sm" onclick="encaisser('${n}')">💰 Encaisser</button>`:""}</td></tr>`}).join("");
-  return `<div class="card"><h2>Nouvelle facture client</h2>
-  <div class="f">
-   <div><label>Date</label><input id="fd" type="date" value="${today()}"></div>
-   <div class="w2"><label>Client</label><input id="fc" placeholder="Nom du client"></div>
-   <div class="w2"><label>Objet (facultatif)</label><input id="fo" placeholder="Ex : Prestation de service octobre"></div>
-   <div><label>Montant HT (${esc(db.params.devise)})</label><input id="fh" type="number" min="0" step="0.01" oninput="apercuFacture()"></div>
-   <div><label>TVA %</label><input id="ft" type="number" min="0" max="100" step="0.01" value="${esc(db.params.tva)}" oninput="apercuFacture()"></div>
-   <div><label>Type de vente</label><select id="fk"><option value="706">Services (706)</option><option value="701">Marchandises (701)</option><option value="702">Produits finis (702)</option></select></div>
-  </div>
-  <p class="mut" id="fap" style="margin:0 0 10px">Prochain numéro : <b>${prochainNum()}</b></p>
-  <button class="btn p" onclick="facturer()">Créer + comptabiliser</button><div id="fres"></div></div>
-  <div class="card"><div class="head"><h2>Factures</h2><button class="btn sm" onclick="exportFactures()">⬇ Excel (CSV)</button></div>${tableau(`<th>N°</th><th>Date</th><th>Client</th><th class="n">HT</th><th class="n">TVA</th><th class="n">TTC</th><th>Statut</th><th class="noprint"></th>`,rows,"Aucune facture.")}</div>`;
-},
 plan(){
   return `<div class="card"><h2>Ajouter un compte</h2>
    <p class="mut" style="margin-top:-6px">Créez un sous-compte si besoin, par exemple 4111 « Client Kinshasa » ou 5211 « Rawbank ».</p>
    <div class="f"><div><label>Numéro</label><input id="cn" inputmode="numeric" placeholder="Ex : 5211"></div><div class="w2"><label>Intitulé</label><input id="cl" placeholder="Ex : Banque Rawbank"></div></div>
    <button class="btn p" onclick="ajoutCompte()">Ajouter</button><div id="cres"></div></div>
-  <div class="card"><div class="head"><h2>Plan comptable SYSCOHADA</h2><input style="width:220px;max-width:100%" placeholder="🔎 Rechercher…" value="${esc(ui.q)}" oninput="ui.q=this.value;saveUi();$('ptab').innerHTML=tablePlan()" id="pq"></div>
+  <div class="card"><div class="head"><h2>Plan comptable SYSCOHADA</h2><input style="width:220px;max-width:100%" placeholder="Rechercher un compte…" value="${esc(ui.q)}" oninput="ui.q=this.value;saveUi();$('ptab').innerHTML=tablePlan()" id="pq"></div>
    <div id="ptab">${tablePlan()}</div></div>`;
 },
 parametres(){
@@ -584,8 +871,8 @@ parametres(){
    <button class="btn p" onclick="enregistrerParams()">Enregistrer</button></div>
   <div class="card"><h2>Sauvegarde</h2>
    <p class="mut">Vos données restent uniquement dans ce navigateur. Téléchargez régulièrement une sauvegarde pour ne rien perdre (changement de téléphone, historique effacé…).</p>
-   <div class="bar"><button class="btn" onclick="sauvegarder()">⬇ Télécharger une sauvegarde</button>
-   <button class="btn" onclick="$('imp').click()">⬆ Restaurer une sauvegarde</button>
+   <div class="bar"><button class="btn" onclick="sauvegarder()">${ico("download",16)} Télécharger une sauvegarde</button>
+   <button class="btn" onclick="$('imp').click()">${ico("upload",16)} Restaurer une sauvegarde</button>
    <input type="file" id="imp" accept=".json,application/json" class="hide" onchange="restaurer(this)"></div><div id="sres"></div></div>
   <div class="card"><h2>Données</h2><div class="bar"><button class="btn" onclick="demo()">Charger une démo</button><button class="btn" style="color:var(--bad)" onclick="resetAll()">Tout effacer</button></div></div>`;
 }};
@@ -599,64 +886,55 @@ views.tarifs=function(){
     <div class="card"><h2>Historique des paiements</h2>${tableau(`<th>Date</th><th>Formule</th><th class="n">Montant</th><th>Moyen</th>`,hist,"Aucun paiement.")}</div></div>
    <h2 style="margin-top:8px">Prolonger ou changer de formule</h2><p class="mut" style="margin-top:-8px">La nouvelle durée s'ajoute à votre formule en cours.</p>${blocTarifs()}`;
 };
-const MENU=[["dashboard","🏠","Tableau de bord"],["saisie","✍️","Saisie"],["journal","📒","Journal"],["grandlivre","📚","Grand livre"],["balance","⚖️","Balance"],["etats","📈","Résultat"],["bilan","🏦","Bilan"],["factures","🧾","Factures"],["plan","🗂️","Plan comptable"],["parametres","⚙️","Paramètres"],["tarifs","💳","Tarifs et compte"]];
-
-// ---------- Graphique ----------
-function graphique(){
-  const fin=ui.au||today();let y=+fin.slice(0,4),m=+fin.slice(5,7);const mois=[];
-  for(let i=0;i<6;i++){mois.unshift(`${y}-${String(m).padStart(2,"0")}`);if(--m===0){m=12;y--}}
-  const data=mois.map(k=>{let p=0,c=0;db.ecritures.filter(e=>e.date.startsWith(k)).forEach(e=>e.lignes.forEach(l=>{
-    if(classe(l.compte)==="7")p+=(l.credit||0)-(l.debit||0);if(classe(l.compte)==="6")c+=(l.debit||0)-(l.credit||0)}));return {k,p:Math.max(p,0),c:Math.max(c,0)}});
-  const max=Math.max(1,...data.flatMap(d=>[d.p,d.c]));
-  const W=520,H=190,bw=24,gx=W/6,NOMS=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
-  const bars=data.map((d,i)=>{const x=i*gx+gx/2,hp=d.p/max*(H-40),hc=d.c/max*(H-40);
-   return `<rect x="${x-bw-2}" y="${H-22-hp}" width="${bw}" height="${hp}" rx="4" fill="var(--ok)"><title>Recettes ${fmt(d.p)}</title></rect>
-    <rect x="${x+2}" y="${H-22-hc}" width="${bw}" height="${hc}" rx="4" fill="var(--bad)" opacity=".8"><title>Dépenses ${fmt(d.c)}</title></rect>
-    <text x="${x}" y="${H-5}" text-anchor="middle" font-size="12" fill="var(--mut)">${NOMS[+d.k.slice(5)-1]}</text>`}).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Recettes et dépenses par mois"><line x1="0" x2="${W}" y1="${H-22}" y2="${H-22}" stroke="var(--line)"/>${bars}</svg>
-   <div class="legend"><span><i style="background:var(--ok)"></i>Recettes</span><span><i style="background:var(--bad)"></i>Dépenses</span></div>`;
-}
+const MENU=[["dashboard","grid","Tableau de bord"],["saisie","edit","Saisie comptable"],["journal","book","Journal des écritures"],["grandlivre","ledger","Grand livre"],["balance","scale","Balance générale"],["etats","chart","Compte de résultat"],["bilan","bank","Bilan"],["factures","receipt","Facturation"],["plan","tree","Plan comptable"],["parametres","gear","Paramètres et sauvegarde"],["tarifs","card","Abonnement et compte"]];
 
 // ---------- Saisie simplifiée ----------
 const estCharge=c=>(classe(c)==="6")||(classe(c)==="2"&&!c.startsWith("28"));
 function qType(){
-  const dep=$("qt").value==="dep";
-  $("qc").innerHTML=dep?optionsComptes(estCharge,"605"):optionsComptes(c=>classe(c)==="7","706");
-  $("qc").dataset.manuel="";
+  const dep=qNat==="dep",vir=qNat==="vir";
+  document.querySelectorAll("#qnat button").forEach(b=>b.classList.toggle("on",b.classList.contains(qNat)));
+  $("qcb").classList.toggle("hide",vir);$("qvb").classList.toggle("hide",!vir);
+  $("qpl").textContent=vir?"Depuis":dep?"Payé par":"Encaissé sur";
+  if(!vir){$("qc").innerHTML=dep?optionsComptes(estCharge,"605"):optionsComptes(c=>classe(c)==="7","706");$("qc").dataset.manuel=""}
   qAide();
 }
 function qAide(){
-  const dep=$("qt").value==="dep",lib=$("ql").value.trim(),c=suggere(lib),sel=$("qc");
+  const lib=$("ql").value.trim();
+  if(qNat==="vir"){$("qaide").innerHTML=lib?`<div class="hint">${ico("swap",16)} Virement entre deux comptes de trésorerie : ni charge, ni produit.</div>`:"";qSim();return}
+  const dep=qNat==="dep",c=suggere(lib),sel=$("qc");
   // Un compte choisi à la main n'est jamais remplacé ; sinon il suit le libellé (et revient au compte par défaut).
   if(!sel.dataset.manuel)sel.value=c&&(dep?estCharge(c):classe(c)==="7")?c:dep?"605":"706";
   const v=sel.value,auto=c===v&&!sel.dataset.manuel;
-  $("qaide").innerHTML=!lib?"":auto?`<div class="hint">💡 Compte choisi : <b>${v} ${esc(nom(v))}</b></div>`
-    :`<div class="hint">${sel.dataset.manuel?"✋ Compte choisi par vous":"❔ Libellé non reconnu, compte par défaut"} : <b>${esc(v)} ${esc(nom(v))}</b>. Vérifiez qu'il convient.</div>`;
+  $("qaide").innerHTML=!lib?"":auto?`<div class="hint">${ico("spark",16)}<span>Compte suggéré par l'assistant : <b>${v} ${esc(nom(v))}</b> (classe ${classe(v)})</span></div>`
+    :`<div class="hint warn">${ico(sel.dataset.manuel?"edit":"alert",16)}<span>${sel.dataset.manuel?"Compte choisi par vous":"Libellé non reconnu, compte par défaut"} : <b>${esc(v)} ${esc(nom(v))}</b>. Vérifiez qu'il convient.</span></div>`;
+  qSim();
 }
 function qValider(){
-  const dep=$("qt").value==="dep",date=$("qd").value,lib=$("ql").value.trim(),m=arr(parseFloat($("qm").value)||0),t=$("qp").value,c=$("qc").value;
-  const err=[];if(!date)err.push("Date requise.");if(!lib)err.push("Libellé requis.");if(m<=0)err.push("Montant supérieur à 0 requis.");if(!c)err.push("Compte requis.");
-  if(err.length){$("qres").innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
-  const L=dep?[{compte:c,debit:m,credit:0},{compte:t,debit:0,credit:m}]:[{compte:t,debit:m,credit:0},{compte:c,debit:0,credit:m}];
+  const date=$("qd").value,lib=$("ql").value.trim(),{m,L}=qLignes(),vir=qNat==="vir";
+  const err=[];if(!date)err.push("Date requise.");if(!lib)err.push("Libellé requis.");if(m<=0)err.push("Montant supérieur à 0 requis.");
+  if(!vir&&!$("qc").value)err.push("Compte requis.");
+  if(vir&&L[0].compte===L[1].compte)err.push("Choisissez deux comptes de trésorerie différents.");
+  if(err.length){$("qres").innerHTML=`<div class="msg bad">${ico("alert",18)}<span>${err.join("<br>")}</span></div>`;return}
   if(!tresoOk(L,date))return;
   db.ecritures.push({id:uid(),date,piece:$("qn").value.trim(),libelle:lib,lignes:L});save();
-  toast((dep?"Dépense":"Recette")+" enregistrée ✔");
-  ["ql","qm","qn"].forEach(i=>$(i).value="");qType();$("qres").innerHTML=`<div class="msg ok">${dep?"Dépense":"Recette"} « ${esc(lib)} » enregistrée ✔ Vous pouvez en saisir une autre.</div>`;$("ql").focus();
+  const quoi=vir?"Virement enregistré":qNat==="dep"?"Dépense enregistrée":"Recette enregistrée";
+  toast(quoi+" ✔");go("saisie");
+  $("qres").innerHTML=`<div class="msg ok">${ico("check",18)}<span>${quoi} : « ${esc(lib)} », ${money(m)}. L'écriture est au journal ; vous pouvez en saisir une autre.</span></div>`;$("ql").focus();
 }
 
 // ---------- Saisie avancée ----------
 let edition=null;
 function addLigne(c="",d="",k=""){
   const el=document.createElement("div");el.className="row";
-  el.innerHTML=`<input list="plan" placeholder="Compte" value="${esc(c)}" oninput="tot()"><input type="number" min="0" step="0.01" placeholder="Débit" value="${esc(d)}" oninput="tot()"><input type="number" min="0" step="0.01" placeholder="Crédit" value="${esc(k)}" oninput="tot()"><button class="btn" title="Retirer la ligne" onclick="this.parentNode.remove();tot()">×</button>`;
+  el.innerHTML=`<input list="plan" placeholder="Compte" value="${esc(c)}" oninput="tot()"><input type="number" min="0" step="0.01" placeholder="Débit" value="${esc(d)}" oninput="tot()"><input type="number" min="0" step="0.01" placeholder="Crédit" value="${esc(k)}" oninput="tot()"><button class="btn x" title="Retirer la ligne" onclick="this.parentNode.remove();tot()">${ico("x",16)}</button>`;
   $("lignes").appendChild(el);
 }
 function lire(){return [...document.querySelectorAll("#lignes .row")].map(r=>{const i=r.querySelectorAll("input");return{compte:i[0].value.trim(),debit:arr(parseFloat(i[1].value)||0),credit:arr(parseFloat(i[2].value)||0)}}).filter(l=>l.compte||l.debit||l.credit)}
 function tot(){const L=lire(),d=Moteur.somme(L,"debit"),c=Moteur.somme(L,"credit"),u=Moteur.enUnites;
-  $("tot").innerHTML=`Débit <b>${fmt(u(d))}</b> · Crédit <b>${fmt(u(c))}</b> · Écart <b style="color:${d===c?'var(--ok)':'var(--bad)'}">${fmt(u(d-c))}</b>`}
+  $("tot").innerHTML=`<span>Débit <b class="deb">${fmt(u(d))}</b> · Crédit <b class="cre">${fmt(u(c))}</b> · Écart <b>${fmt(u(d-c))}</b></span><span class="tag ${d===c&&d>0?"ok":"bad"}">${d===c&&d>0?"✔ Écriture équilibrée":"Débit et crédit doivent être égaux"}</span>`}
 function aide(){
   const c=suggere($("lib").value);
-  $("aide").innerHTML=c?`<div class="hint">💡 Compte suggéré : <b>${c} ${esc(nom(c))}</b> <button class="btn sm" onclick="appliquer('${c}')">Utiliser</button></div>`:"";
+  $("aide").innerHTML=c?`<div class="hint">${ico("spark",16)}<span style="flex:1">Compte suggéré par l'assistant : <b>${c} ${esc(nom(c))}</b></span><button class="btn sm p" onclick="appliquer('${c}')">Appliquer</button></div>`:"";
 }
 function appliquer(c){const L=document.querySelector("#lignes .row input");if(L&&!L.value){L.value=c;}else addLigne(c);tot()}
 function valider(){
@@ -712,6 +990,8 @@ function majFacture({f,type},e){
   const tva=L.filter(l=>l.compte==="4431");
   f.ht=Moteur.enUnites(Moteur.somme(ventes,"credit"));
   f.tva=Moteur.enUnites(Moteur.somme(tva,"credit")-Moteur.somme(tva,"debit"));
+  // Montant HT modifié à la main : le détail des lignes ne correspond plus, on ne garde que le total.
+  if(f.lignes&&Moteur.enUnites(Moteur.somme(f.lignes,"montant"))!==f.ht)f.lignes=null;
   f.taux=f.ht?arr(f.tva/f.ht*100):0;
   f.compte=ventes[0].compte;
   if(e.libelle.startsWith("Facture ")&&e.libelle.slice(8).trim())f.client=e.libelle.slice(8).trim();
@@ -731,20 +1011,40 @@ function prochainNum(){
   const max=db.factures.reduce((m,f)=>Math.max(m,parseInt(String(f.num).replace(/\D/g,""),10)||0),0);
   return "F"+String(max+1).padStart(4,"0");
 }
+function fLigne(des="",qte=1,pu=""){
+  const el=document.createElement("div");el.className="inl";
+  el.innerHTML=`<input placeholder="Désignation (ex : Audit comptable)" value="${esc(des)}" oninput="apercuFacture()" aria-label="Désignation"><input type="number" min="0" step="any" value="${esc(qte)}" oninput="apercuFacture()" aria-label="Quantité"><input type="number" min="0" step="0.01" placeholder="Prix" value="${esc(pu)}" oninput="apercuFacture()" aria-label="Prix unitaire HT"><output class="hm">—</output><button class="btn x" title="Retirer la ligne" onclick="this.parentNode.remove();apercuFacture()">${ico("x",16)}</button>`;
+  $("flignes").appendChild(el);
+}
+function lireLignesF(){
+  return [...document.querySelectorAll("#flignes .inl")].map(r=>{const i=r.querySelectorAll("input");return {des:i[0].value.trim(),qte:parseFloat(i[1].value),pu:parseFloat(i[2].value),r}}).filter(l=>l.des||isFinite(l.pu));
+}
 function apercuFacture(){
-  const {ht,tva,ttc}=Moteur.calculFacture(parseFloat($("fh").value)||0,parseFloat($("ft").value)||0);
-  $("fap").innerHTML=`Prochain numéro : <b>${prochainNum()}</b>${ht?` · TVA ${fmt(tva)} · <b>Total TTC ${money(ttc)}</b>`:""}`;
+  document.querySelectorAll("#flignes .inl").forEach(r=>{const i=r.querySelectorAll("input"),q=parseFloat(i[1].value),u=parseFloat(i[2].value);
+    r.querySelector("output").textContent=q>0&&u>0?fmt(Moteur.calculFactureLignes([{qte:q,pu:u}],0).ht):"—"});
+  const t=parseFloat($("ft").value)||0,r=Moteur.calculFactureLignes(lireLignesF().filter(l=>l.qte>0&&l.pu>0),t),p=db.params,dv=esc(p.devise),ech=$("fe").value;
+  $("fap").innerHTML=`<div class="pro"><div class="head" style="align-items:flex-start;margin-bottom:10px"><div style="margin-right:auto;min-width:0"><b style="font-family:var(--fh);font-size:16px">${esc(p.societe)}</b>
+    <div class="mut" style="font-size:12px">${[p.rccm&&"RCCM : "+esc(p.rccm),p.nif&&"NIF : "+esc(p.nif),esc(p.adresse)].filter(Boolean).join(" · ")||'<a href="#" onclick="go(\'parametres\');return false">Compléter les informations de l\'entreprise</a>'}</div></div>
+    <div style="text-align:right"><span class="tag acc">APERÇU</span><div class="mut" style="font-size:12px;margin-top:4px">N° ${prochainNum()} · ${dfr($("fd").value)}</div></div></div>
+   <div class="kl" style="padding:8px 10px;margin-bottom:8px"><span><span class="mic">Facturé à</span><br><b>${esc($("fc").value.trim())||"—"}</b></span><span style="text-align:right"><span class="mic">Devise</span><br><b>${dv}</b></span></div>
+   <div class="tt"><span>Sous-total hors taxes (HT)</span><b class="num">${money(r.ht)}</b></div>
+   <div class="tt"><span>TVA (${String(t).replace(".",",")} %)</span><b class="num">${money(r.tva)}</b></div>
+   <div class="tt ttc"><b style="font-size:13px">TOTAL TTC</b><b class="num">${money(r.ttc)}</b></div>
+   ${ech?`<p class="mut" style="font-size:12px;margin:8px 0 0">${ico("clock",14)} Échéance : ${dfr(ech)}</p>`:""}</div>`;
 }
 function facturer(){
-  const ht=arr(parseFloat($("fh").value)||0),t=parseFloat($("ft").value)||0,cl=$("fc").value.trim(),date=$("fd").value,objet=$("fo").value.trim(),compte=$("fk").value;
-  const out=$("fres");
-  if(!cl||ht<=0||!date){out.innerHTML=`<div class="msg bad">Date, client et montant HT (supérieur à 0) requis.</div>`;return}
-  if(t<0||t>100){out.innerHTML=`<div class="msg bad">Le taux de TVA doit être entre 0 et 100 %.</div>`;return}
-  const {tva,ttc}=Moteur.calculFacture(ht,t),num=prochainNum();
-  db.factures.push({num,date,client:cl,objet,taux:t,compte,ht,tva,ttc,payee:null});
-  const L=Moteur.lignesFacture({ht,tva,ttc,compte});
-  db.ecritures.push({id:uid(),date,piece:num,libelle:"Facture "+cl,lien:"facture",lignes:L});
-  save();go("factures");toast(`Facture ${num} créée ✔`);voirFacture(num);
+  const cl=$("fc").value.trim(),date=$("fd").value,ech=$("fe").value,t=parseFloat($("ft").value),compte=$("fk").value,out=$("fres");
+  const brutes=lireLignesF(),err=[];
+  if(!cl)err.push("Nom du client requis.");if(!date)err.push("Date requise.");
+  if(ech&&date&&ech<date)err.push("L'échéance ne peut pas précéder la date de la facture.");
+  if(!isFinite(t)||t<0||t>100)err.push("Le taux de TVA doit être entre 0 et 100 %.");
+  if(!brutes.length)err.push("Ajoutez au moins une ligne avec un prix.");
+  brutes.forEach((l,i)=>{const n=`Ligne ${i+1} : `;if(!l.des)err.push(n+"désignation manquante.");if(!(l.qte>0))err.push(n+"quantité supérieure à 0 requise.");if(!(l.pu>0))err.push(n+"prix unitaire supérieur à 0 requis.")});
+  if(err.length){out.innerHTML=`<div class="msg bad">${ico("alert",18)}<span>${err.join("<br>")}</span></div>`;return}
+  const r=Moteur.calculFactureLignes(brutes,t),num=prochainNum();
+  db.factures.push({num,date,echeance:ech||null,client:cl,objet:r.lignes.map(l=>l.des).join(", "),lignes:r.lignes,taux:t,compte,ht:r.ht,tva:r.tva,ttc:r.ttc,payee:null});
+  db.ecritures.push({id:uid(),date,piece:num,libelle:"Facture "+cl,lien:"facture",lignes:Moteur.lignesFacture({ht:r.ht,tva:r.tva,ttc:r.ttc,compte})});
+  save();go("factures");toast(`Facture ${num} créée et comptabilisée ✔`);voirFacture(num);
 }
 function fermer(){$("modal").innerHTML="";document.body.classList.remove("mopen")}
 function ouvrir(html){$("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)fermer()"><div class="card">${html}</div></div>`;document.body.classList.add("mopen")}
@@ -752,14 +1052,15 @@ function voirFacture(num){
   const f=db.factures.find(x=>x.num===num);if(!f)return;const p=db.params,[st]=factStatut(f);
   const infos=[p.adresse,p.tel,p.email].filter(Boolean).map(esc).join("<br>");
   const legal=[p.rccm&&"RCCM : "+esc(p.rccm),p.nif&&"NIF : "+esc(p.nif)].filter(Boolean).join(" · ");
-  ouvrir(`<div class="bar noprint" style="margin-bottom:12px"><b style="margin-right:auto">Facture ${esc(f.num)} <span class="tag">${st}</span></b><button class="btn p" onclick="print()">🖨 Imprimer / PDF</button><button class="btn" onclick="fermer()">Fermer</button></div>
+  ouvrir(`<div class="bar noprint" style="margin-bottom:12px"><b style="margin-right:auto">Facture ${esc(f.num)} <span class="tag">${st}</span></b><button class="btn p" onclick="print()">${ico("print",16)} Imprimer / PDF</button><button class="btn o" onclick="fermer()">Fermer</button></div>
   <div class="inv">
    <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px">
     <div><b style="font-size:17px">${esc(p.societe)}</b><br><span style="color:#555;font-size:13px">${infos}${legal?"<br>"+legal:""}</span></div>
-    <div style="text-align:right"><h3>FACTURE${f.annulee?" (ANNULÉE)":""}</h3><div>N° <b>${esc(f.num)}</b></div><div>Date : ${dfr(f.date)}</div></div>
+    <div style="text-align:right"><h3>FACTURE${f.annulee?" (ANNULÉE)":""}</h3><div>N° <b>${esc(f.num)}</b></div><div>Date : ${dfr(f.date)}</div>${f.echeance?`<div>Échéance : ${dfr(f.echeance)}</div>`:""}</div>
    </div>
    <div style="background:#f6f8fa;border-radius:8px;padding:10px 14px;margin-bottom:18px"><span style="color:#666;font-size:13px">Facturé à</span><br><b>${esc(f.client)}</b></div>
-   <table><tr><th>Désignation</th><th class="n">Montant HT</th></tr><tr><td>${esc(f.objet||"Prestation / vente")}</td><td class="n">${fmt(f.ht)}</td></tr></table>
+   ${f.lignes&&f.lignes.length?`<table><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unitaire HT</th><th class="n">Montant HT</th></tr>${f.lignes.map(l=>`<tr><td>${esc(l.des)}</td><td class="n">${esc(String(l.qte).replace(".",","))}</td><td class="n">${fmt(l.pu)}</td><td class="n">${fmt(l.montant)}</td></tr>`).join("")}</table>`
+    :`<table><tr><th>Désignation</th><th class="n">Montant HT</th></tr><tr><td>${esc(f.objet||"Prestation / vente")}</td><td class="n">${fmt(f.ht)}</td></tr></table>`}
    <table style="width:auto;margin:14px 0 0 auto;min-width:240px">
     <tr><td>Total HT</td><td class="n">${money(f.ht)}</td></tr>
     <tr><td>TVA ${f.taux!=null?esc(f.taux)+" %":""}</td><td class="n">${money(f.tva)}</td></tr>
@@ -783,7 +1084,7 @@ function confirmerEncaissement(num){
 // ---------- Plan comptable ----------
 function tablePlan(){
   const q=(ui.q||"").toLowerCase().trim(),perso=new Set(db.comptes.map(c=>c.num));
-  const rows=comptes().filter(([c,n])=>!q||c.startsWith(q)||n.toLowerCase().includes(q)).map(([c,n])=>`<tr><td>${c}</td><td>${esc(n)}${perso.has(c)?' <span class="tag">ajouté</span>':""}</td><td class="mut">${CLASSES[classe(c)]||""}</td><td class="noprint">${perso.has(c)?`<button class="btn x" title="Supprimer" onclick="supprCompte('${c}')">🗑</button>`:""}</td></tr>`).join("");
+  const rows=comptes().filter(([c,n])=>!q||c.startsWith(q)||n.toLowerCase().includes(q)).map(([c,n])=>`<tr><td>${c}</td><td>${esc(n)}${perso.has(c)?' <span class="tag">ajouté</span>':""}</td><td class="mut">${CLASSES[classe(c)]||""}</td><td class="noprint">${perso.has(c)?`<button class="btn x" title="Supprimer" onclick="supprCompte('${c}')">${ico("trash",16)}</button>`:""}</td></tr>`).join("");
   return tableau(`<th>Compte</th><th>Intitulé</th><th>Classe</th><th class="noprint"></th>`,rows,"Aucun compte trouvé.");
 }
 function ajoutCompte(){
@@ -857,8 +1158,8 @@ function exportGL(){
   csvDl("grand-livre-"+c,L);
 }
 function exportFactures(){
-  const L=[["N°","Date","Client","Objet","HT","TVA","TTC","Statut","Payée le"]];
-  db.factures.forEach(f=>L.push([f.num,dfr(f.date),f.client,f.objet||"",num(f.ht),num(f.tva),num(f.ttc),factStatut(f)[0],dfr(f.payee)]));
+  const L=[["N°","Date","Échéance","Client","Objet","HT","TVA","TTC","Statut","Payée le"]];
+  db.factures.forEach(f=>L.push([f.num,dfr(f.date),dfr(f.echeance),f.client,f.objet||"",num(f.ht),num(f.tva),num(f.ttc),factStatut(f)[0],dfr(f.payee)]));
   csvDl("factures",L);
 }
 function sauvegarder(){telecharger(`compteassist-sauvegarde-${today()}.json`,JSON.stringify(db,null,1),"application/json")}
@@ -915,7 +1216,8 @@ function etatAcces(){
   const b=$("banner");
   if(abonneActif()){
     const p=PLANS.find(x=>x.id===acces.abo.plan)||{nom:""};
-    b.innerHTML=`✅ Formule <b>${esc(p.nom)}</b> active · ${resteTexte()}${PAIEMENT_REEL?"":' <span class="tag">mode test</span>'} <button class="btn sm" onclick="go('tarifs')">Prolonger</button>`;
+    const ms=acces.abo.fin-Date.now();
+    b.innerHTML=`<small>Abonnement</small><div class="row2"><b>Formule ${esc(p.nom)}</b><span class="pill">${ms<2*JOUR?resteTexte():Math.ceil(ms/JOUR)+" j restants"}</span></div>${PAIEMENT_REEL?"":"<small>Mode test : paiement simulé</small>"}`;
     b.classList.remove("hide");
   }else b.classList.add("hide");
   const g=$("gate");
@@ -929,7 +1231,7 @@ function afficherPorte(vue){
   const g=$("gate");
   vue=vue||(payPlan?"paiement":!acces.compte?"inscription":!acces.connecte?"connexion":"tarifs");
   g.dataset.vue=vue;
-  const logo=`<div class="logo" style="color:var(--ink);justify-content:center"><i>📒</i><div>CompteAssist<small style="color:var(--mut)">SYSCOHADA RÉVISÉ</small></div></div>`;
+  const logo=`<div class="logo">${LOGO}</div>`;
   let h;
   if(vue==="inscription")h=`<div style="max-width:460px;margin:0 auto">${logo}${etapes(0)}<div class="card">${formInscription()}</div></div>`;
   else if(vue==="connexion")h=`<div style="max-width:460px;margin:0 auto">${logo}${etapes(0)}<div class="card">${formConnexion()}</div></div>`;
@@ -940,7 +1242,7 @@ function afficherPorte(vue){
      <div class="card" style="text-align:center;max-width:820px;margin:0 auto 16px"><h2 style="font-size:20px">${expire?"Votre formule est terminée":"Choisissez votre formule"}</h2>
       <p class="mut" style="margin:0">Bonjour ${esc(acces.compte.nom)}, choisissez une formule de location pour ${expire?"continuer à utiliser":"accéder à"} votre assistant comptable.${expire?" Vos données sont conservées.":""}</p></div>
      ${blocTarifs()}
-     <div class="bar" style="justify-content:center">${db.ecritures.length?`<button class="btn" onclick="sauvegarder()">⬇ Télécharger mes données</button>`:""}<button class="btn" onclick="deconnexion()">Se déconnecter</button></div></div>`;
+     <div class="bar" style="justify-content:center">${db.ecritures.length?`<button class="btn" onclick="sauvegarder()">${ico("download",16)} Télécharger mes données</button>`:""}<button class="btn" onclick="deconnexion()">Se déconnecter</button></div></div>`;
   }
   g.innerHTML=h;g.scrollTop=0;
 }
@@ -1053,10 +1355,19 @@ function go(v){
   const m=MENU.find(x=>x[0]===v);
   $("titre").textContent=m[2];document.title=m[2]+" – CompteAssist";
   $("du").value=ui.du;$("au").value=ui.au;
+  const t=today(),pa=!ui.du&&!ui.au?"tout":ui.du===t.slice(0,8)+"01"&&!ui.au?"mois":ui.du===t.slice(0,4)+"-01-01"&&ui.au===t.slice(0,4)+"-12-31"?"annee":"";
+  $("presets").innerHTML=[["mois","Ce mois"],["annee","Cette année"],["tout","Tout"]].map(([k,l])=>`<button class="${pa===k?"on":""}" onclick="periodePreset('${k}')">${l}</button>`).join("");
   $("app").innerHTML=views[v]();
-  $("nav").innerHTML=MENU.map(x=>`<button class="${x[0]===v?'on':''}" onclick="go('${x[0]}')"><span>${x[1]}</span>${x[2]}</button>`).join("");
+  $("nav").innerHTML=MENU.map(x=>`<button class="${x[0]===v?'on':''}" onclick="go('${x[0]}')">${ico(x[1],19)}${x[2]}</button>`).join("");
+  const qui=(acces.compte&&acces.compte.nom)||db.params.societe||"?";
+  $("actions").innerHTML=`<button class="btn p" onclick="ui.mode='simple';saveUi();go('saisie')">${ico("plus",16)} Écriture</button><button class="btn hm" onclick="go('factures')">${ico("receipt",16)} Facturer</button><button class="ib" id="theme" onclick="basculerTheme()" title="Mode clair / sombre"></button><button class="av" onclick="go('tarifs')" title="Mon compte">${esc(qui.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase())}</button>`;
+  appliquerTheme();
+  const py=pays(db.params.pays);
+  $("entreprise").innerHTML=`<div class="row2">${ico("building",18)}<span style="flex:1;min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(db.params.societe)}</b><small>${esc(db.params.devise)}${py?" · "+esc(py[1]):""}</small></span></div>`;
+  if(v==="journal")jRendu();
+  if(v==="factures"){fLigne();apercuFacture()}
   if(v==="saisie"){
-    if($("qt"))qType();
+    if($("qnat"))qType();
     else{const e=edition&&db.ecritures.find(x=>x.id===edition);
       if(e)e.lignes.forEach(l=>addLigne(l.compte,l.debit||"",l.credit||""));else{addLigne();addLigne()}tot()}
   }
@@ -1064,6 +1375,7 @@ function go(v){
   etatAcces();
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape")fermer()});
+$("logo").innerHTML=LOGO;
 appliquerTheme();
 go(accesLibre()?ui.vue:"dashboard");
 setInterval(etatAcces,30000);

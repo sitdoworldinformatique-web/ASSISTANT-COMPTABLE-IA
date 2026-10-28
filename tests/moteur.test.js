@@ -102,3 +102,15 @@ test("restauration : sauvegardes altérées refusées",()=>{
   const date=jeu();date[2].date="10/01/2026";
   assert.match(M.controleSauvegarde({ecritures:date,factures:[]})[0],/date invalide/);
 });
+
+test("facture sur plusieurs lignes : quantité × prix unitaire, TVA sur le total",()=>{
+  const r=M.calculFactureLignes([{des:"Audit comptable",qte:1,pu:1800000},{des:"Formation SYSCOHADA",qte:2,pu:350000}],16);
+  assert.equal(r.ht,2500000);assert.equal(r.tva,400000);assert.equal(r.ttc,2900000);
+  assert.deepEqual(r.lignes.map(l=>l.montant),[1800000,700000]);
+  // Arrondi au centime ligne par ligne : 3 × 33,333 = 99,99 (pas 100)
+  assert.equal(M.calculFactureLignes([{des:"x",qte:3,pu:33.333}],0).ht,99.99);
+  // Quantité décimale
+  assert.equal(M.calculFactureLignes([{des:"x",qte:1.5,pu:10.01}],0).ht,15.02);
+  // Mêmes montants que la facture sur une ligne
+  assert.deepEqual((({ht,tva,ttc})=>({ht,tva,ttc}))(M.calculFactureLignes([{des:"x",qte:1,pu:2000}],16)),M.calculFacture(2000,16));
+});
