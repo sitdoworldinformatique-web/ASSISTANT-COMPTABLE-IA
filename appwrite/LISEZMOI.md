@@ -37,7 +37,7 @@ Le fichier ouvert directement depuis le disque (`file://…`) ne peut pas se con
 2. **Function ID** : `compteassist` (cliquez sur l'identifiant proposé pour le modifier).
    Si vous en gardez un autre, remplacez `compteassist` par cet identifiant dans `index.html`.
 3. **Runtime** : Node.js 22 (ou la version Node la plus récente proposée).
-4. **Branche** : `main` ; **Root directory** : `appwrite/fonction` ; **Entrypoint** : `src/main.js` ;
+4. **Branche** : `main` (ou `appwrite` tant que la PR n’est pas fusionnée, puis repassez sur `main`) ; **Root directory** : `appwrite/fonction` ; **Entrypoint** : `src/main.js` ;
    **Build commands** : `npm install`.
 5. **Execute access** : **Users** (tout utilisateur connecté). La fonction vérifie elle-même à quelle entreprise
    chacun a droit.
