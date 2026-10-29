@@ -114,3 +114,46 @@ test("facture sur plusieurs lignes : quantité × prix unitaire, TVA sur le tota
   // Mêmes montants que la facture sur une ligne
   assert.deepEqual((({ht,tva,ttc})=>({ht,tva,ttc}))(M.calculFactureLignes([{des:"x",qte:1,pu:2000}],16)),M.calculFacture(2000,16));
 });
+
+test("contrepassation : comptes identiques, débit et crédit inversés, origine intacte",()=>{
+  const e=jeu()[3],avant=JSON.stringify(e);
+  const c=M.contrepasser(e,{id:"c1",date:"2026-03-31"});
+  assert.equal(JSON.stringify(e),avant);
+  assert.equal(c.contrepasse,"F0001");assert.equal(c.statut,"validee");assert.equal(c.piece,"F0001");
+  assert.deepEqual(c.lignes,[{compte:"411",debit:0,credit:2320},{compte:"706",debit:2000,credit:0},{compte:"4431",debit:320,credit:0}]);
+  assert.equal(M.equilibree(c.lignes),true);
+  // Écriture + contrepassation : tous les comptes reviennent à zéro.
+  const s=M.soldes([e,c]);
+  ["411","706","4431"].forEach(k=>assert.equal(M.sd(s,k),0));
+  assert.equal(M.resultat([e,c]).res,0);
+});
+
+test("exercices : chevauchement refusé, période clôturée détectée",()=>{
+  const ex=[{id:"x2025",debut:"2025-01-01",fin:"2025-12-31",cloture:true},{id:"x2026",debut:"2026-01-01",fin:"2026-12-31",cloture:false}];
+  assert.deepEqual(M.controleExercice(ex,{id:"n",debut:"2027-01-01",fin:"2027-12-31"}),[]);
+  assert.equal(M.controleExercice(ex,{id:"n",debut:"2026-07-01",fin:"2027-06-30"}).length,1);
+  assert.equal(M.controleExercice(ex,{id:"n",debut:"2027-12-31",fin:"2027-01-01"}).length,1);
+  assert.equal(M.controleExercice(ex,{id:"x2026",debut:"2026-01-01",fin:"2026-12-31"}).length,0,"un exercice ne se chevauche pas lui-même");
+  assert.equal(M.exerciceClos(ex,"2025-06-15").id,"x2025");
+  assert.equal(M.exerciceClos(ex,"2026-06-15"),null);
+  assert.equal(M.exerciceClos(ex,"2024-12-31"),null);
+});
+
+test("clôture : refusée tant qu'une écriture de l'exercice est au brouillard",()=>{
+  const x={id:"x2026",debut:"2026-01-01",fin:"2026-12-31"},E2=jeu();
+  assert.match(M.controleCloture(E2,x)[0],/6 écriture\(s\).*brouillard/);
+  E2.forEach(e=>e.statut="validee");
+  assert.deepEqual(M.controleCloture(E2,x),[]);
+  // Une écriture hors de l'exercice ne bloque pas.
+  E2.push({...E2[0],id:"z",date:"2027-01-02",statut:undefined});
+  assert.deepEqual(M.controleCloture(E2,x),[]);
+});
+
+test("sauvegarde : statut et exercices contrôlés",()=>{
+  const d={ecritures:jeu(),factures:[],exercices:[{id:"x1",debut:"2026-01-01",fin:"2026-12-31",cloture:false}]};
+  assert.deepEqual(M.controleSauvegarde(d),[]);
+  d.ecritures[0].statut="effacee";
+  d.exercices[0].fin="2025-01-01";
+  const err=M.controleSauvegarde(d);
+  assert.equal(err.length,2);
+});
