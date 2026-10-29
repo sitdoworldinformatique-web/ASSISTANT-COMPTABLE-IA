@@ -143,4 +143,43 @@ do $$ begin
 end $$;
 reset role;
 
+-- Test 11 : une écriture validée ne se modifie plus et ne se supprime plus ; la contrepassation passe.
+set role authenticated;
+select connecter('00000000-0000-0000-0000-00000000000a');
+select enregistrer_ecriture(ea(), '{"id":"v1","date":"2026-03-10","libelle":"Loyer","lignes":[{"compte":"622","debit":800},{"compte":"521","credit":800}]}');
+select enregistrer_ecriture(ea(), '{"id":"v1","date":"2026-03-10","libelle":"Loyer","statut":"validee","lignes":[{"compte":"622","debit":800},{"compte":"521","credit":800}]}');
+do $$ begin assert (select statut = 'validee' and valide_le is not null from ecritures where id = 'v1'), 'validée'; end $$;
+select doit_echouer($q$select enregistrer_ecriture(ea(), '{"id":"v1","date":"2026-03-10","libelle":"Loyer modifié","statut":"validee","lignes":[{"compte":"622","debit":900},{"compte":"521","credit":900}]}')$q$, 'contrepassation');
+select doit_echouer($q$select enregistrer_ecriture(ea(), '{"id":"v1","date":"2026-03-10","libelle":"Loyer","statut":"brouillon","lignes":[{"compte":"622","debit":800},{"compte":"521","credit":800}]}')$q$, 'contrepassation');
+select doit_echouer($q$select supprimer_ecriture(ea(), 'v1')$q$, 'contrepassation');
+select doit_echouer($q$select enregistrer_ecriture(ea(), '{"id":"v9","date":"2026-03-10","libelle":"X","statut":"effacee","lignes":[{"compte":"622","debit":1},{"compte":"521","credit":1}]}')$q$, 'statut invalide');
+select enregistrer_ecriture(ea(), '{"id":"cp1","date":"2026-03-11","libelle":"Contrepassation : Loyer","statut":"validee","contrepasse":"v1","lignes":[{"compte":"622","credit":800},{"compte":"521","debit":800}]}');
+do $$ begin
+  assert (select sum(debit) - sum(credit) from lignes where entreprise_id = ea() and compte = '622' and ecriture_id in ('v1','cp1')) = 0, 'contrepassation annule le loyer';
+  assert (select contrepasse from ecritures where id = 'cp1') = 'v1', 'lien de contrepassation';
+end $$;
+
+-- Test 12 : clôture refusée tant qu'il reste du brouillard dans l'exercice ; chevauchement refusé.
+select enregistrer_ecriture(ea(), '{"id":"b1","date":"2026-06-01","libelle":"Brouillon","lignes":[{"compte":"601","debit":50},{"compte":"571","credit":50}]}');
+select enregistrer_exercice(ea(), '{"id":"x2026","debut":"2026-01-01","fin":"2026-12-31","cloture":false}');
+select doit_echouer($q$select enregistrer_exercice(ea(), '{"id":"x2026","debut":"2026-01-01","fin":"2026-12-31","cloture":true}')$q$, 'brouillard');
+select doit_echouer($q$select enregistrer_exercice(ea(), '{"id":"xbis","debut":"2026-07-01","fin":"2027-06-30"}')$q$, 'chevauche');
+
+-- Test 13 : après clôture, la période est verrouillée et l'exercice ne se rouvre pas.
+select enregistrer_ecriture(ea(), '{"id":"b1","date":"2026-06-01","libelle":"Brouillon","statut":"validee","lignes":[{"compte":"601","debit":50},{"compte":"571","credit":50}]}');
+select enregistrer_exercice(ea(), '{"id":"x2026","debut":"2026-01-01","fin":"2026-12-31","cloture":true}');
+do $$ begin assert (select cloture and cloture_le is not null from exercices where id = 'x2026'), 'exercice clôturé'; end $$;
+select doit_echouer($q$select enregistrer_ecriture(ea(), '{"id":"n1","date":"2026-08-01","libelle":"Tardive","lignes":[{"compte":"601","debit":5},{"compte":"571","credit":5}]}')$q$, 'clôturée');
+select doit_echouer($q$select enregistrer_exercice(ea(), '{"id":"x2026","debut":"2026-01-01","fin":"2026-12-31","cloture":false}')$q$, 'ne peut plus être modifié');
+select doit_echouer($q$select supprimer_exercice(ea(), 'x2026')$q$, 'ne peut pas être supprimé');
+-- Une erreur d'un exercice clos se corrige par contrepassation datée dans l'exercice suivant.
+select enregistrer_ecriture(ea(), '{"id":"cp2","date":"2027-01-05","libelle":"Contrepassation : Brouillon","statut":"validee","contrepasse":"b1","lignes":[{"compte":"601","credit":50},{"compte":"571","debit":50}]}');
+do $$ begin assert (select count(*) from journal_audit where objet = 'exercice x2026' and action = 'cloture') = 1, 'clôture tracée'; end $$;
+
+-- Test 14 : un autre utilisateur ne voit pas les exercices et ne peut pas en créer chez Awa.
+select connecter('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from exercices where entreprise_id = ea()) = 1, 'Bako, lecteur chez Awa, voit l''exercice'; end $$;
+select doit_echouer($q$select enregistrer_exercice(ea(), '{"id":"pirate","debut":"2030-01-01","fin":"2030-12-31"}')$q$, 'accès refusé');
+reset role;
+
 \echo 'Base Supabase : tous les tests sont passés.'

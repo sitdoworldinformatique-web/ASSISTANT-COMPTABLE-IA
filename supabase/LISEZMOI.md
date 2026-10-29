@@ -7,6 +7,10 @@ Sans Supabase, l'application garde tout dans le navigateur, comme avant. Avec Su
 - chaque entreprise ne voit que ses propres données (règles d'accès de PostgreSQL, testées) ;
 - le serveur refuse toute écriture déséquilibrée ou mal formée, même si quelqu'un contourne l'écran ;
 - chaque création, modification et suppression est tracée dans `journal_audit`.
+- une écriture validée ne peut plus être modifiée ni supprimée, et rien ne s'écrit dans un exercice clôturé.
+
+Si la base a déjà été créée avec une version précédente du script, relancez simplement le script complet :
+il ajoute ce qui manque sans rien effacer.
 
 ## 1. Créer le projet (5 minutes)
 

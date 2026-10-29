@@ -354,6 +354,32 @@ const Moteur=(()=>{
     return L;
   }
 
+  // ---------- Validation, contrepassation et exercices ----------
+  // Une écriture validée ne se modifie plus et ne se supprime plus : on la corrige par contrepassation.
+  // Une écriture sans statut (anciennes données) est au brouillard, donc encore modifiable.
+  const estValidee=e=>e.statut==="validee";
+  // Exercice clôturé qui contient cette date, ou null si la période est ouverte.
+  const exerciceClos=(exercices,date)=>(exercices||[]).find(x=>x.cloture&&date>=x.debut&&date<=x.fin)||null;
+  // Contrepassation : mêmes comptes et montants, débit et crédit inversés. L'écriture d'origine reste intacte.
+  function contrepasser(e,{id,date}){
+    return {id,date,piece:e.piece||"",libelle:("Contrepassation : "+e.libelle).slice(0,300),contrepasse:e.id,statut:"validee",valideeLe:date,
+      lignes:e.lignes.map(l=>({compte:l.compte,debit:l.credit||0,credit:l.debit||0}))};
+  }
+  function controleExercice(exercices,x){
+    if(!DATE.test(String(x.debut))||!DATE.test(String(x.fin)))return ["Dates de l'exercice invalides."];
+    if(x.fin<x.debut)return ["La fin de l'exercice doit être après son début."];
+    const autre=(exercices||[]).find(y=>y.id!==x.id&&x.debut<=y.fin&&y.debut<=x.fin);
+    return autre?[`Cet exercice chevauche l'exercice du ${autre.debut} au ${autre.fin}.`]:[];
+  }
+  // Conditions de clôture : toutes les écritures de l'exercice validées, et équilibrées.
+  function controleCloture(ecritures,x){
+    const dans=ecritures.filter(e=>e.date>=x.debut&&e.date<=x.fin),err=[];
+    const b=dans.filter(e=>!estValidee(e)).length;
+    if(b)err.push(`${b} écriture(s) de l'exercice sont encore au brouillard : validez-les avant la clôture.`);
+    if(!equilibree(dans.flatMap(e=>e.lignes)))err.push("Les écritures de l'exercice ne sont pas équilibrées.");
+    return err;
+  }
+
   // Contrôle d'une sauvegarde avant restauration : structure, dates, comptes, montants, équilibre.
   // Les identifiants et numéros sont insérés dans la page : ils doivent rester de simples codes.
   const CODE=/^[A-Za-z0-9_-]{1,40}$/,DATE=/^\d{4}-\d{2}-\d{2}$/,COMPTE=/^[1-9]\d{1,7}$/;
@@ -366,6 +392,8 @@ const Moteur=(()=>{
       if(!e||typeof e!=="object"){err.push(n+"illisible.");return}
       if(e.id!==undefined&&!CODE.test(String(e.id)))err.push(n+"identifiant invalide.");
       if(!DATE.test(String(e.date)))err.push(n+"date invalide.");
+      if(e.statut!==undefined&&e.statut!=="brouillon"&&e.statut!=="validee")err.push(n+"statut invalide.");
+      if(e.contrepasse!==undefined&&!CODE.test(String(e.contrepasse)))err.push(n+"référence de contrepassation invalide.");
       if(!Array.isArray(e.lignes)||e.lignes.length<2){err.push(n+"au moins deux lignes requises.");return}
       if(e.lignes.some(l=>!l||!COMPTE.test(String(l.compte))))err.push(n+"numéro de compte invalide.");
       if(e.lignes.some(l=>l&&(!montantOk(l.debit)||!montantOk(l.credit))))err.push(n+"montant invalide.");
@@ -376,11 +404,13 @@ const Moteur=(()=>{
       if(!f||!CODE.test(String(f.num)))err.push(n+"numéro invalide.");
       else if(!["ht","tva","ttc"].every(k=>montantOk(f[k])))err.push(n+"montant invalide.");
     });
+    if(d.exercices!==undefined&&(!Array.isArray(d.exercices)||d.exercices.some(x=>!x||!CODE.test(String(x.id))||!DATE.test(String(x.debut))||!DATE.test(String(x.fin))||x.fin<x.debut)))err.push("Exercices comptables : dates ou identifiant invalides.");
     if(d.comptes!==undefined&&(!Array.isArray(d.comptes)||d.comptes.some(c=>!c||!COMPTE.test(String(c.num)))))err.push("Plan comptable : numéro de compte invalide.");
     return err;
   }
 
-  return {enCentimes,enUnites,arrondir,somme,equilibree,verifierLignes,soldes,sd,resultat,bilan,balance,grandLivre,calculFacture,calculFactureLignes,lignesFacture,controleSauvegarde};
+  return {enCentimes,enUnites,arrondir,somme,equilibree,verifierLignes,soldes,sd,resultat,bilan,balance,grandLivre,calculFacture,calculFactureLignes,lignesFacture,
+    estValidee,exerciceClos,contrepasser,controleExercice,controleCloture,controleSauvegarde};
 })();
 if(typeof module==="object"&&module.exports)module.exports=Moteur;
 </script>
@@ -465,6 +495,7 @@ const KEY="compteassist.v1",UIKEY="compteassist.ui";
 const PARAMS0={societe:"Mon entreprise",adresse:"",tel:"",email:"",rccm:"",nif:"",pays:"",devise:"CDF",tva:16,mentions:"Merci pour votre confiance."};
 function normaliser(d){
   d.comptes=Array.isArray(d.comptes)?d.comptes:[];
+  d.exercices=Array.isArray(d.exercices)?d.exercices:[];
   d.params=Object.assign({},PARAMS0,d.params||{});
   d.ecritures.forEach(e=>{if(!e.id)e.id=uid()});
   return d;
@@ -535,10 +566,12 @@ const Nuage=(()=>{
 
   // Forme envoyée au serveur : montants arrondis au centime, champs connus seulement.
   const formeEcriture=e=>({id:e.id,date:e.date,piece:e.piece||"",libelle:e.libelle,lien:e.lien||null,
+    statut:Moteur.estValidee(e)?"validee":"brouillon",contrepasse:e.contrepasse||null,
     lignes:e.lignes.map(l=>({compte:String(l.compte),debit:Moteur.arrondir(l.debit||0),credit:Moteur.arrondir(l.credit||0)}))});
   const formeFacture=f=>Object.assign({},f,{ht:Moteur.arrondir(f.ht),tva:Moteur.arrondir(f.tva),ttc:Moteur.arrondir(f.ttc)});
   function photo(d){
-    const m={e:{},f:{},c:{},p:JSON.stringify(d.params)};
+    const m={e:{},f:{},c:{},x:{},p:JSON.stringify(d.params)};
+    d.exercices.forEach(x=>m.x[x.id]=JSON.stringify({id:x.id,debut:x.debut,fin:x.fin,cloture:!!x.cloture}));
     d.ecritures.forEach(e=>m.e[e.id]=JSON.stringify(formeEcriture(e)));
     d.factures.forEach(f=>m.f[f.num]=JSON.stringify(formeFacture(f)));
     d.comptes.forEach(c=>m.c[c.num]=c.nom);
@@ -550,7 +583,7 @@ const Nuage=(()=>{
     if(!connecte())return;
     if(enCours){encore=true;return enCours}
     enCours=(async()=>{
-      const eid=acces.entreprise,a=miroir||{e:{},f:{},c:{},p:""},b=photo(db);let refus=[];
+      const eid=acces.entreprise,a=Object.assign({e:{},f:{},c:{},x:{},p:""},miroir),b=photo(db);let refus=[];
       signaler("envoi");
       try{
         const pas=async(fn,ok)=>{try{await fn();ok()}catch(e){if(e.reseau||e.statut===401||!e.statut)throw e;refus.push(e.message)}};
@@ -560,6 +593,9 @@ const Nuage=(()=>{
         for(const n in b.f)if(a.f[n]!==b.f[n])await pas(()=>rpc("enregistrer_facture",{p_entreprise:eid,p_facture:JSON.parse(b.f[n])}),()=>a.f[n]=b.f[n]);
         for(const n in a.c)if(!(n in b.c))await pas(()=>appel(`/rest/v1/comptes_perso?entreprise_id=eq.${eid}&num=eq.${encodeURIComponent(n)}`,{methode:"DELETE"}),()=>delete a.c[n]);
         for(const n in b.c)if(a.c[n]!==b.c[n])await pas(()=>appel(`/rest/v1/comptes_perso?on_conflict=entreprise_id,num`,{methode:"POST",prefer:"resolution=merge-duplicates",corps:{entreprise_id:eid,num:n,nom:b.c[n]}}),()=>a.c[n]=b.c[n]);
+        // Les exercices passent après les écritures : une clôture exige que toutes ses écritures soient validées.
+        for(const id in a.x)if(!(id in b.x))await pas(()=>rpc("supprimer_exercice",{p_entreprise:eid,p_id:id}),()=>delete a.x[id]);
+        for(const id in b.x)if(a.x[id]!==b.x[id])await pas(()=>rpc("enregistrer_exercice",{p_entreprise:eid,p_exercice:JSON.parse(b.x[id])}),()=>a.x[id]=b.x[id]);
         if(a.p!==b.p){const p=db.params;await pas(()=>appel(`/rest/v1/entreprises?id=eq.${eid}`,{methode:"PATCH",corps:{nom:p.societe||"Mon entreprise",pays:p.pays||null,devise:p.devise,params:p}}),()=>a.p=b.p)}
         miroir=a;garderMiroir();
         refus.length?signaler("erreur",(refus.length>1?refus.length+" éléments refusés par le serveur. ":"Refusé par le serveur : ")+refus[0]):signaler("ok");
@@ -577,13 +613,15 @@ const Nuage=(()=>{
   async function tirer(){
     const [ent]=await appel(`/rest/v1/entreprises?id=eq.${acces.entreprise}&select=nom,pays,devise,params`);
     if(!ent)throw new Error("Entreprise introuvable sur le serveur.");
-    const E=await toutLire("ecritures","id,date,piece,libelle,lien,lignes(rang,compte,debit,credit)&order=date,id");
+    const E=await toutLire("ecritures","id,date,piece,libelle,lien,statut,valide_le,contrepasse,lignes(rang,compte,debit,credit)&order=date,id");
+    const X=await toutLire("exercices","id,debut,fin,cloture,cloture_le&order=debut");
     const F=await toutLire("factures","donnees&order=date,num");
     const C=await toutLire("comptes_perso","num,nom&order=num");
     const d=normaliser({
       ecritures:E.map(e=>{const x={id:e.id,date:e.date,piece:e.piece,libelle:e.libelle,
         lignes:e.lignes.sort((a,b)=>a.rang-b.rang).map(l=>({compte:l.compte,debit:Moteur.enUnites(l.debit),credit:Moteur.enUnites(l.credit)}))};
-        if(e.lien)x.lien=e.lien;return x}),
+        if(e.lien)x.lien=e.lien;if(e.statut==="validee"){x.statut="validee";x.valideeLe=e.valide_le}if(e.contrepasse)x.contrepasse=e.contrepasse;return x}),
+      exercices:X.map(x=>({id:x.id,debut:x.debut,fin:x.fin,cloture:x.cloture,...(x.cloture_le?{clotureLe:x.cloture_le.slice(0,10)}:{})})),
       factures:F.map(f=>f.donnees),comptes:C,
       params:Object.assign({},ent.params,{societe:ent.nom,pays:ent.pays||"",devise:ent.devise})});
     db=d;try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}
@@ -615,12 +653,12 @@ const Nuage=(()=>{
       acces.entreprise=await rpc("creer_entreprise",{p_nom:p.societe||"Mon entreprise",p_pays:p.pays||"",p_devise:p.devise||PARAMS0.devise,p_params:p});
       saveAcces();
     }
-    miroir={e:{},f:{},c:{},p:m?"":JSON.stringify(db.params)};garderLocal();
+    miroir={e:{},f:{},c:{},x:{},p:m?"":JSON.stringify(db.params)};garderLocal();
     await pousser();
   }
   // Modifications pas encore acceptées par le serveur.
   const enAttente=()=>{if(!miroir)return 0;const b=photo(db),a=miroir;let n=0;
-    for(const k of ["e","f","c"]){for(const x in b[k])if(a[k][x]!==b[k][x])n++;for(const x in a[k])if(!(x in b[k]))n++}
+    for(const k of ["e","f","c","x"]){const ak=a[k]||{};for(const x in b[k])if(ak[x]!==b[k][x])n++;for(const x in ak)if(!(x in b[k]))n++}
     return n+(a.p!==b.p?1:0)};
 
   async function inscrire(email,mdp,infos){
@@ -657,6 +695,10 @@ const Nuage=(()=>{
 // ---------- Période ----------
 const dansPeriode=e=>(!ui.du||e.date>=ui.du)&&(!ui.au||e.date<=ui.au);
 const ecrP=()=>db.ecritures.filter(dansPeriode);
+// Verrouillage : rien ne s'écrit dans un exercice clôturé.
+const clos=date=>Moteur.exerciceClos(db.exercices,date);
+const textClos=date=>{const x=clos(date);return x?`La période du ${dfr(x.debut)} au ${dfr(x.fin)} est clôturée : choisissez une date dans un exercice ouvert.`:""};
+const contrepasseePar=id=>db.ecritures.find(x=>x.contrepasse===id);
 const ecrJusquAu=()=>db.ecritures.filter(e=>!ui.au||e.date<=ui.au);
 const libPeriode=()=>ui.du||ui.au?`du ${dfr(ui.du)||"début"} au ${dfr(ui.au)||"aujourd'hui"}`:"toutes les dates";
 function periode(){ui.du=$("du").value;ui.au=$("au").value;saveUi();go(ui.vue)}
@@ -749,6 +791,7 @@ const ICO={
  building:'<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/>',
  spark:'<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+ lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>'
 };
 const ico=(n,s=20)=>`<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]||""}</svg>`;
@@ -806,13 +849,69 @@ function jRendu(){
   const list=[...ecrP()].sort((a,b)=>a.date.localeCompare(b.date))
     .filter(e=>!q||String(e.piece).toLowerCase().includes(q)||e.libelle.toLowerCase().includes(q)||e.lignes.some(l=>l.compte.startsWith(q)||nom(l.compte).toLowerCase().includes(q)));
   const L=list.flatMap(e=>e.lignes),td=Moteur.enUnites(Moteur.somme(L,"debit")),tc=Moteur.enUnites(Moteur.somme(L,"credit"));
-  const rows=list.map(e=>e.lignes.map((l,i)=>`<tr${i?"":' style="border-top:2px solid var(--line)"'}><td style="white-space:nowrap">${i?"":dfr(e.date)}</td><td>${i||!e.piece?"":`<span class="pc">${esc(e.piece)}</span>`}</td><td>${i?"":`<b style="font-weight:600">${esc(e.libelle)}</b>`}</td>
+  const rows=list.map(e=>e.lignes.map((l,i)=>`<tr${i?"":' style="border-top:2px solid var(--line)"'}><td style="white-space:nowrap">${i?"":dfr(e.date)}</td><td>${i||!e.piece?"":`<span class="pc">${esc(e.piece)}</span>`}</td><td>${i?"":`<b style="font-weight:600">${esc(e.libelle)}</b> ${statutEcriture(e)}`}</td>
    <td><button class="${cptCls(l.compte)}" onclick="jSel('${esc(l.compte)}')" title="Voir l'extrait du grand livre">${esc(l.compte)}</button></td><td>${pastille(l.compte)}${esc(nom(l.compte))}</td><td class="n deb">${l.debit?fmt(l.debit):""}</td><td class="n cre">${l.credit?fmt(l.credit):""}</td>
-   <td class="noprint" style="white-space:nowrap">${i?"":`<button class="btn x" title="Modifier" onclick="modifier('${e.id}')">${ico("edit",16)}</button><button class="btn x" title="Supprimer" onclick="supprimer('${e.id}')">${ico("trash",16)}</button>`}</td></tr>`).join("")).join("");
+   <td class="noprint" style="white-space:nowrap">${i?"":actionsEcriture(e)}</td></tr>`).join("")).join("");
   $("jt").innerHTML=tableau(`<th>Date</th><th>N° pièce</th><th>Libellé de l'opération</th><th>Compte</th><th>Intitulé SYSCOHADA</th><th class="n">Débit</th><th class="n">Crédit</th><th class="noprint"></th>`,
     rows&&rows+`<tr class="tot"><th colspan=5>Totaux ${q?"de la recherche":"de la période"} (${list.length} écriture(s))</th><th class="n">${fmt(td)}</th><th class="n">${fmt(tc)}</th><th class="noprint"></th></tr>`,q?"Aucune écriture ne correspond à cette recherche.":"Aucune écriture sur cette période.");
   $("jn").textContent=`${list.length} écriture(s) affichée(s)`;
   jPanneau();
+}
+// Statut affiché dans le journal, et actions permises selon ce statut.
+function statutEcriture(e){
+  if(clos(e.date))return `<span class="tag" title="Exercice clôturé">${ico("lock",11)} Clôturée</span>`;
+  if(!Moteur.estValidee(e))return '<span class="tag warn" title="Encore modifiable">Brouillard</span>';
+  return contrepasseePar(e.id)?'<span class="tag" title="Annulée par une contrepassation">Contrepassée</span>':'<span class="tag ok">Validée</span>';
+}
+function actionsEcriture(e){
+  if(clos(e.date)&&!Moteur.estValidee(e))return "";
+  if(!Moteur.estValidee(e))return `<button class="btn x" title="Valider (l'écriture ne sera plus modifiable)" onclick="validerEcritures(['${e.id}'])">${ico("check",16)}</button><button class="btn x" title="Modifier" onclick="modifier('${e.id}')">${ico("edit",16)}</button><button class="btn x" title="Supprimer" onclick="supprimer('${e.id}')">${ico("trash",16)}</button>`;
+  return e.contrepasse||contrepasseePar(e.id)?"":`<button class="btn x" title="Contrepasser (corriger une écriture validée)" onclick="demanderContrepassation('${e.id}')">${ico("swap",16)}</button>`;
+}
+const AVIS_VALIDATION="Une écriture validée ne peut plus être modifiée ni supprimée : elle ne se corrige que par contrepassation.";
+// Validation : l'écriture entre définitivement au journal.
+function validerEcritures(ids){
+  const L=db.ecritures.filter(e=>ids.includes(e.id)&&!Moteur.estValidee(e)&&!clos(e.date));if(!L.length)return;
+  if(!confirm((L.length===1?`Valider l'écriture « ${L[0].libelle} » ?`:`Valider ${L.length} écritures ?`)+"\n\n"+AVIS_VALIDATION))return;
+  const t=today();L.forEach(e=>{e.statut="validee";e.valideeLe=t});
+  save();fermer();go("journal");toast(L.length===1?"Écriture validée ✔":L.length+" écritures validées ✔");
+}
+const brouillard=(jusqua)=>db.ecritures.filter(e=>!Moteur.estValidee(e)&&!clos(e.date)&&(!jusqua||e.date<=jusqua));
+function demanderValidation(){
+  const b=brouillard();
+  if(!b.length){toast("Aucune écriture au brouillard");return}
+  ouvrir(`<h2>Valider le brouillard</h2><p class="mut">${AVIS_VALIDATION}</p>
+   <div class="f"><div><label>Valider les écritures jusqu'au</label><input type="date" id="vb" value="${b.reduce((m,e)=>e.date>m?e.date:m,"")}" oninput="$('vbn').textContent=brouillard(this.value).length"></div>
+    <div><label>Écritures concernées</label><b id="vbn" style="font-size:20px">${b.length}</b></div></div>
+   <div class="bar"><button class="btn p" onclick="validerEcritures(brouillard($('vb').value).map(e=>e.id))">${ico("check",16)} Valider</button><button class="btn" onclick="fermer()">Annuler</button></div>`);
+}
+// Contrepassation : annule une écriture validée par une écriture inverse, sans la modifier.
+function demanderContrepassation(id){
+  const e=db.ecritures.find(x=>x.id===id);if(!e)return;const lien=lienFacture(e);
+  const t=today(),d=t<e.date?e.date:t;
+  ouvrir(`<h2>Contrepasser l'écriture</h2><p class="mut">« ${esc(e.libelle)} » du ${dfr(e.date)} · ${money(Moteur.enUnites(Moteur.somme(e.lignes,"debit")))}</p>
+   <p>Une écriture inverse (débit et crédit échangés) sera passée au journal : elle annule les effets de l'écriture d'origine, qui reste visible.${lien&&lien.type==="facture"?` La facture ${esc(lien.f.num)} passera en « Annulée ».`:lien?` La facture ${esc(lien.f.num)} repassera en « À encaisser ».`:""}</p>
+   <div class="f"><div><label>Date de la contrepassation</label><input type="date" id="cpd" value="${d}" min="${esc(e.date)}"></div></div>
+   <label class="opt" style="margin-bottom:12px"><input type="checkbox" id="cpc"${lien?"":" checked"}><span><b>Saisir ensuite l'écriture corrigée</b><em>La saisie s'ouvre avec les lignes d'origine, à modifier</em></span></label>
+   <div id="cpres"></div>
+   <div class="bar"><button class="btn p" onclick="contrepasser('${e.id}')">${ico("swap",16)} Contrepasser</button><button class="btn" onclick="fermer()">Annuler</button></div>`);
+}
+function contrepasser(id){
+  const e=db.ecritures.find(x=>x.id===id),date=$("cpd").value,out=$("cpres");if(!e)return;
+  const err=[],lien=lienFacture(e);
+  if(!Moteur.estValidee(e))err.push("Seule une écriture validée se contrepasse ; une écriture au brouillard se modifie directement.");
+  if(contrepasseePar(e.id))err.push("Cette écriture a déjà été contrepassée.");
+  if(!date)err.push("Date requise.");else if(date<e.date)err.push("La contrepassation ne peut pas précéder l'écriture d'origine.");
+  if(date&&clos(date))err.push(textClos(date));
+  if(lien&&lien.type==="facture"&&lien.f.payee)err.push(`La facture ${esc(lien.f.num)} est déjà encaissée : contrepassez d'abord l'écriture d'encaissement.`);
+  if(err.length){out.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
+  db.ecritures.push(Moteur.contrepasser(e,{id:uid(),date}));
+  if(lien&&lien.type==="facture")lien.f.annulee=true;
+  if(lien&&lien.type==="encaissement")lien.f.payee=null;
+  const corriger=$("cpc").checked;
+  save();fermer();toast("Écriture contrepassée ✔");
+  if(corriger){modele={libelle:e.libelle,piece:e.piece,lignes:e.lignes};edition=null;go("saisie");$("dt").value=date}
+  else go("journal");
 }
 function jSel(c){ui.gl=c;saveUi();jPanneau();if(innerWidth<1100)$("jgl").scrollIntoView({behavior:"smooth"})}
 function jPanneau(){
@@ -906,7 +1005,7 @@ dashboard(){
 saisie(){
   const ed=edition?db.ecritures.find(e=>e.id===edition):null;
   if(!ed)edition=null;
-  const mode=ed?"avancee":ui.mode,dv=esc(db.params.devise);
+  const mode=ed||modele?"avancee":ui.mode,dv=esc(db.params.devise);
   const s=soldes(db.ecritures),recent=[...db.ecritures].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
   const opts=(name,sel)=>`<div class="opts">${TRESO.map(([c,n])=>`<label class="opt"><input type="radio" name="${name}" value="${c}"${c===sel?" checked":""} onchange="qSim()"><span><b>${n}</b><em>Solde : ${fmt(sd(s,c))}</em></span><code>${c}</code></label>`).join("")}</div>`;
   return `<div class="card"><div class="phead"><div class="ptile"><span class="tile">${ico("spark",22)}</span><div><h1>Saisie comptable <span class="tag acc" style="vertical-align:4px">Assistant SYSCOHADA</span></h1><p>Imputation automatique selon le plan SYSCOHADA révisé · montants en ${dv}</p></div></div>
@@ -925,7 +1024,7 @@ saisie(){
    <div id="qvb" class="hide"><label>Vers</label>${opts("qv","521")}</div>
    <div class="f"><div><label for="qn">N° de pièce justificative <span class="mut" style="font-weight:400">(facultatif)</span></label><input id="qn" placeholder="Reçu, ticket, facture…" oninput="qSim()"></div></div>
    <div class="sim" id="qsim"></div>
-   <div class="bar"><button class="btn o" onclick="go('saisie')">Effacer la saisie</button><span class="sp"></span><button class="btn p" onclick="qValider()">${ico("check",16)} Valider au journal</button></div>
+   <div class="bar"><button class="btn o" onclick="go('saisie')">Effacer la saisie</button><span class="sp"></span><button class="btn p" onclick="qValider()">${ico("check",16)} Enregistrer au journal</button></div>
    <div id="qres"></div></div>
    <div><div class="card"><h2>${ico("wallet",18)} Soldes de trésorerie</h2>
      ${TRESO.map(([c,n])=>`<div class="li"><span class="tile">${ico(c==="571"?"cash":c==="552"?"wallet":"bank",16)}</span><div class="grow"><b>${n}</b><div>Compte ${c}</div></div><div class="amt"><b class="${sd(s,c)<0?"deb":""}">${fmt(sd(s,c))}</b>${dv}</div></div>`).join("")}</div>
@@ -940,7 +1039,7 @@ saisie(){
    <div id="lignes"></div>
    <button class="btn sm" onclick="addLigne()">${ico("plus",14)} Ligne</button>
    <div id="tot" class="foot"></div>
-   <div class="bar" style="margin-top:14px"><button class="btn p" onclick="valider()">${ico("check",16)} ${ed?"Enregistrer les modifications":"Valider au journal"}</button>${ed?`<button class="btn o" onclick="edition=null;go('journal')">Annuler</button>`:""}</div><div id="res"></div></div>
+   <div class="bar" style="margin-top:14px"><button class="btn p" onclick="valider()">${ico("check",16)} ${ed?"Enregistrer les modifications":"Enregistrer au journal"}</button>${ed?`<button class="btn o" onclick="edition=null;go('journal')">Annuler</button>`:""}</div><div id="res"></div></div>
    <datalist id="plan">${comptes().map(p=>`<option value="${p[0]}">${esc(p[1])}</option>`).join("")}</datalist>`}`;
 },
 journal(){
@@ -948,7 +1047,7 @@ journal(){
   const d=Moteur.somme(lignes,"debit"),c=Moteur.somme(lignes,"credit"),u=Moteur.enUnites,dv=esc(db.params.devise);
   return `<div class="phead" style="margin-bottom:16px"><div><span class="tag acc">SYSCOHADA révisé</span> <span class="mut">${esc(db.params.societe)} · ${libPeriode()}</span>
     <h1 style="margin-top:6px">Journal général <span class="mut" style="font:400 13px var(--ff)">(écritures chronologiques)</span></h1></div>
-   <div class="bar noprint"><button class="btn o" onclick="exportJournal()">${ico("download",16)} Export CSV</button><button class="btn o" onclick="print()">${ico("print",16)} Imprimer / PDF</button><button class="btn p" onclick="go('grandlivre')">${ico("ledger",16)} Grand livre</button></div></div>
+   <div class="bar noprint">${brouillard().length?`<button class="btn" onclick="demanderValidation()">${ico("check",16)} Valider le brouillard (${brouillard().length})</button>`:""}<button class="btn o" onclick="exportJournal()">${ico("download",16)} Export CSV</button><button class="btn o" onclick="print()">${ico("print",16)} Imprimer / PDF</button><button class="btn p" onclick="go('grandlivre')">${ico("ledger",16)} Grand livre</button></div></div>
   <div class="totbar"><span class="mic">Total débit</span><b class="deb">${fmt(u(d))} <small>${dv}</small></b><span class="mic">Total crédit</span><b class="cre">${fmt(u(c))} <small>${dv}</small></b>
    <span class="mic">Écart</span><b>${fmt(u(d-c))}</b><span class="sp"></span><span class="tag ${d===c?"ok":"bad"}">${d===c?"Journal équilibré ✔":"Journal déséquilibré"}</span></div>
   <div class="card noprint" style="padding:12px"><div class="bar"><div class="money" style="flex:1;min-width:220px"><input id="jq" placeholder="Rechercher : n° de pièce, libellé ou compte" value="${esc(ui.jq||"")}" oninput="ui.jq=this.value;saveUi();jRendu()"><em>${ico("search",16)}</em></div><span class="mut" id="jn"></span></div></div>
@@ -1042,6 +1141,7 @@ parametres(){
     <div><label>TVA par défaut (%)</label><input id="p_tva" type="number" min="0" max="100" step="0.01" value="${esc(p.tva)}"></div>
     <div class="w2"><label>Mention en bas des factures</label><input id="p_mentions" value="${esc(p.mentions)}"></div></div>
    <button class="btn p" onclick="enregistrerParams()">Enregistrer</button></div>
+  ${carteExercices()}
   <div class="card"><h2>Sauvegarde</h2>
    <p class="mut">Vos données restent uniquement dans ce navigateur. Téléchargez régulièrement une sauvegarde pour ne rien perdre (changement de téléphone, historique effacé…).</p>
    <div class="bar"><button class="btn" onclick="sauvegarder()">${ico("download",16)} Télécharger une sauvegarde</button>
@@ -1087,6 +1187,7 @@ function qValider(){
   const err=[];if(!date)err.push("Date requise.");if(!lib)err.push("Libellé requis.");if(m<=0)err.push("Montant supérieur à 0 requis.");
   if(!vir&&!$("qc").value)err.push("Compte requis.");
   if(vir&&L[0].compte===L[1].compte)err.push("Choisissez deux comptes de trésorerie différents.");
+  if(date&&clos(date))err.push(textClos(date));
   if(err.length){$("qres").innerHTML=`<div class="msg bad">${ico("alert",18)}<span>${err.join("<br>")}</span></div>`;return}
   if(!tresoOk(L,date))return;
   db.ecritures.push({id:uid(),date,piece:$("qn").value.trim(),libelle:lib,lignes:L});save();
@@ -1096,7 +1197,7 @@ function qValider(){
 }
 
 // ---------- Saisie avancée ----------
-let edition=null;
+let edition=null,modele=null;
 function addLigne(c="",d="",k=""){
   const el=document.createElement("div");el.className="row";
   el.innerHTML=`<input list="plan" placeholder="Compte" value="${esc(c)}" oninput="tot()"><input type="number" min="0" step="0.01" placeholder="Débit" value="${esc(d)}" oninput="tot()"><input type="number" min="0" step="0.01" placeholder="Crédit" value="${esc(k)}" oninput="tot()"><button class="btn x" title="Retirer la ligne" onclick="this.parentNode.remove();tot()">${ico("x",16)}</button>`;
@@ -1119,15 +1220,25 @@ function valider(){
   err.push(...Moteur.verifierLignes(L,existe).map(esc));
   const piece=$("pc").value.trim(),e=edition&&db.ecritures.find(x=>x.id===edition),lien=e&&lienFacture(e);
   if(lien&&!err.length)err.push(...verifFacture(lien,piece,L));
+  if(e&&Moteur.estValidee(e))err.push("Cette écriture est validée : elle ne peut plus être modifiée. Corrigez-la par une contrepassation depuis le journal.");
+  if(date&&clos(date))err.push(textClos(date));
+  else if(e&&clos(e.date))err.push(textClos(e.date));
   if(err.length){res.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
   if(!tresoOk(L,date,e&&e.id))return;
   if(e){Object.assign(e,{date,piece,libelle:lib,lignes:L});if(lien)majFacture(lien,e);toast("Écriture modifiée ✔")}
   else{db.ecritures.push({id:uid(),date,piece,libelle:lib,lignes:L});toast("Écriture enregistrée ✔")}
   edition=null;save();go("journal");
 }
-function modifier(id){edition=id;go("saisie")}
+function modifier(id){
+  const e=db.ecritures.find(x=>x.id===id);if(!e)return;
+  if(Moteur.estValidee(e)){alert("Cette écriture est validée : elle ne peut plus être modifiée. Utilisez « Contrepasser » pour la corriger.");return}
+  if(clos(e.date)){alert(textClos(e.date));return}
+  edition=id;go("saisie");
+}
 function supprimer(id){
   const e=db.ecritures.find(x=>x.id===id);if(!e)return;
+  if(Moteur.estValidee(e)){alert("Cette écriture est validée : elle ne peut plus être supprimée. Utilisez « Contrepasser » pour l'annuler.");return}
+  if(clos(e.date)){alert(textClos(e.date));return}
   const lien=lienFacture(e);
   if(lien&&lien.type==="facture"&&lien.f.payee){alert(`La facture ${lien.f.num} est déjà encaissée. Supprimez d'abord l'écriture d'encaissement, puis celle de la facture.`);return}
   if(!confirm(`Supprimer l'écriture « ${e.libelle} » du ${dfr(e.date)} ?${lien?`\nLa facture ${lien.f.num} passera en « ${lien.type==="facture"?"Annulée":"À encaisser"} ».`:""}`))return;
@@ -1139,6 +1250,7 @@ function supprimer(id){
 // Lien entre une écriture et sa facture (type « facture » ou « encaissement »).
 // Les anciennes écritures n'ont pas le champ « lien » : on le retrouve par le n° de pièce et le libellé.
 function lienFacture(e){
+  if(e.contrepasse)return null;
   const f=db.factures.find(x=>x.num===e.piece);if(!f||f.annulee)return null;
   const type=e.lien||(e.libelle.startsWith("Facture ")?"facture":e.libelle.startsWith("Encaissement ")?"encaissement":null);
   return type?{f,type}:null;
@@ -1210,6 +1322,7 @@ function facturer(){
   const brutes=lireLignesF(),err=[];
   if(!cl)err.push("Nom du client requis.");if(!date)err.push("Date requise.");
   if(ech&&date&&ech<date)err.push("L'échéance ne peut pas précéder la date de la facture.");
+  if(date&&clos(date))err.push(textClos(date));
   if(!isFinite(t)||t<0||t>100)err.push("Le taux de TVA doit être entre 0 et 100 %.");
   if(!brutes.length)err.push("Ajoutez au moins une ligne avec un prix.");
   brutes.forEach((l,i)=>{const n=`Ligne ${i+1} : `;if(!l.des)err.push(n+"désignation manquante.");if(!(l.qte>0))err.push(n+"quantité supérieure à 0 requise.");if(!(l.pu>0))err.push(n+"prix unitaire supérieur à 0 requis.")});
@@ -1250,6 +1363,7 @@ function encaisser(num){
 }
 function confirmerEncaissement(num){
   const f=db.factures.find(x=>x.num===num),date=$("ed").value,c=$("ec").value;if(!f||!date)return;
+  if(clos(date)){alert(textClos(date));return}
   db.ecritures.push({id:uid(),date,piece:f.num,libelle:"Encaissement "+f.num+" "+f.client,lien:"encaissement",lignes:[{compte:c,debit:f.ttc,credit:0},{compte:"411",debit:0,credit:f.ttc}]});
   f.payee=date;save();go("factures");toast("Paiement enregistré ✔");
 }
@@ -1273,6 +1387,35 @@ function supprCompte(n){
   db.comptes=db.comptes.filter(c=>c.num!==n);save();go("plan");
 }
 
+// ---------- Exercices comptables ----------
+function carteExercices(){
+  const X=[...db.exercices].sort((a,b)=>b.debut.localeCompare(a.debut)),an=X[0]?+X[0].fin.slice(0,4)+1:+today().slice(0,4);
+  return `<div class="card"><h2>${ico("lock",18)} Exercices comptables</h2>
+   <p class="mut" style="margin-top:-6px">La clôture d'un exercice verrouille sa période : plus aucune écriture ne peut y être ajoutée, modifiée ou supprimée. Elle demande que toutes ses écritures soient validées.</p>
+   ${X.length?tableau(`<th>Exercice</th><th>Écritures</th><th>État</th><th class="noprint"></th>`,X.map(x=>{const E=db.ecritures.filter(e=>e.date>=x.debut&&e.date<=x.fin),b=E.filter(e=>!Moteur.estValidee(e)).length;
+     return `<tr><td>Du ${dfr(x.debut)} au ${dfr(x.fin)}</td><td>${E.length}${b?` <span class="tag warn">${b} au brouillard</span>`:""}</td><td>${x.cloture?`<span class="tag">${ico("lock",11)} Clôturé${x.clotureLe?" le "+dfr(x.clotureLe):""}</span>`:'<span class="tag ok">Ouvert</span>'}</td>
+      <td class="noprint" style="white-space:nowrap">${x.cloture?"":`<button class="btn sm" onclick="cloturer('${x.id}')">${ico("lock",14)} Clôturer</button><button class="btn x" title="Supprimer" onclick="supprimerExercice('${x.id}')">${ico("trash",16)}</button>`}</td></tr>`}).join(""),""):'<p class="mut">Aucun exercice défini : toutes les périodes sont ouvertes.</p>'}
+   <div class="f" style="margin-top:12px"><div><label>Début</label><input type="date" id="xd" value="${an}-01-01"></div><div><label>Fin</label><input type="date" id="xf" value="${an}-12-31"></div></div>
+   <button class="btn" onclick="ajouterExercice()">${ico("plus",16)} Ajouter l'exercice</button><div id="xres"></div></div>`;
+}
+function ajouterExercice(){
+  const x={id:"x"+uid(),debut:$("xd").value,fin:$("xf").value,cloture:false},err=Moteur.controleExercice(db.exercices,x);
+  if(err.length){$("xres").innerHTML=`<div class="msg bad">${err.map(esc).join("<br>")}</div>`;return}
+  db.exercices.push(x);save();go("parametres");toast("Exercice ajouté ✔");
+}
+function supprimerExercice(id){
+  const x=db.exercices.find(y=>y.id===id);if(!x||x.cloture)return;
+  if(!confirm(`Supprimer l'exercice du ${dfr(x.debut)} au ${dfr(x.fin)} ? Les écritures ne sont pas touchées.`))return;
+  db.exercices=db.exercices.filter(y=>y.id!==id);save();go("parametres");
+}
+function cloturer(id){
+  const x=db.exercices.find(y=>y.id===id);if(!x||x.cloture)return;
+  const err=Moteur.controleCloture(db.ecritures,x);
+  if(err.length){$("xres").innerHTML=`<div class="msg bad">Clôture impossible :<br>${err.map(esc).join("<br>")}${brouillard().length?`<br><a href="#" onclick="go('journal');return false">Aller au journal pour valider le brouillard</a>`:""}</div>`;return}
+  if(!confirm(`Clôturer l'exercice du ${dfr(x.debut)} au ${dfr(x.fin)} ?\n\nC'est définitif : plus aucune écriture ne pourra être ajoutée, modifiée ou supprimée dans cette période.`))return;
+  x.cloture=true;x.clotureLe=today();save();go("parametres");toast("Exercice clôturé ✔");
+}
+
 // ---------- Paramètres ----------
 function enregistrerParams(){
   const p=db.params;
@@ -1283,6 +1426,7 @@ function enregistrerParams(){
   save();toast("Paramètres enregistrés ✔");go("parametres");
 }
 function demo(){
+  if(db.exercices.some(x=>x.cloture)){alert("Des exercices sont clôturés : les données de démonstration ne peuvent plus être ajoutées.");return}
   if(db.ecritures.length&&!confirm("Des données existent déjà. Ajouter quand même les données de démonstration ?"))return;
   const t=today(),y0=+t.slice(0,4),m0=+t.slice(5,7);
   const m=(k,j)=>{let y=y0,mm=m0-k;while(mm<1){mm+=12;y--}return `${y}-${String(mm).padStart(2,"0")}-${String(j).padStart(2,"0")}`};
@@ -1314,8 +1458,8 @@ const num=n=>n?arr(n).toFixed(2).replace(".",","):"";
 const csv=lignes=>"﻿"+lignes.map(l=>l.map(cel).join(";")).join("\r\n");
 const csvDl=(nomF,L)=>telecharger(`${nomF}-${today()}.csv`,csv(L),"text/csv;charset=utf-8");
 function exportJournal(){
-  const L=[["Date","Pièce","Libellé","Compte","Intitulé","Débit","Crédit"]];
-  [...ecrP()].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>e.lignes.forEach(l=>L.push([dfr(e.date),e.piece,e.libelle,l.compte,nom(l.compte),num(l.debit),num(l.credit)])));
+  const L=[["Date","Pièce","Libellé","Compte","Intitulé","Débit","Crédit","Statut"]];
+  [...ecrP()].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>e.lignes.forEach(l=>L.push([dfr(e.date),e.piece,e.libelle,l.compte,nom(l.compte),num(l.debit),num(l.credit),Moteur.estValidee(e)?"Validée":"Brouillard"])));
   csvDl("journal",L);
 }
 function exportBalance(){
@@ -1568,7 +1712,9 @@ function go(v){
   if(v==="saisie"){
     if($("qnat"))qType();
     else{const e=edition&&db.ecritures.find(x=>x.id===edition);
-      if(e)e.lignes.forEach(l=>addLigne(l.compte,l.debit||"",l.credit||""));else{addLigne();addLigne()}tot()}
+      if(e)e.lignes.forEach(l=>addLigne(l.compte,l.debit||"",l.credit||""));
+      else if(modele){modele.lignes.forEach(l=>addLigne(l.compte,l.debit||"",l.credit||""));$("lib").value=modele.libelle;$("pc").value=modele.piece||"";modele=null}
+      else{addLigne();addLigne()}tot()}
   }
   window.scrollTo(0,0);
   etatAcces();

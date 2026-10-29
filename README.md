@@ -16,6 +16,13 @@ npm test
 
 (Node.js 20 ou plus récent, aucune dépendance à installer.) Ils tournent aussi sur GitHub à chaque PR.
 
+## Validation, contrepassation et clôture
+
+Une écriture saisie est d'abord au **brouillard** : elle reste modifiable. Une fois **validée**, elle ne peut plus
+être modifiée ni supprimée : on la corrige par **contrepassation** (écriture inverse, l'originale reste visible).
+Les **exercices comptables** se définissent dans Paramètres ; la clôture d'un exercice exige que toutes ses
+écritures soient validées et verrouille sa période. Avec Supabase, le serveur applique les mêmes règles.
+
 ## Comptes et données en ligne (Supabase)
 
 Facultatif : sans réglage, tout reste dans le navigateur. Pour de vrais comptes, des données partagées

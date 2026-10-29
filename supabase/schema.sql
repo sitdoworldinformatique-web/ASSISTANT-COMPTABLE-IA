@@ -52,6 +52,22 @@ create table if not exists public.ecritures(
   primary key (entreprise_id, id)
 );
 create index if not exists ecritures_date on public.ecritures(entreprise_id, date);
+-- Brouillard ou validée. Une écriture validée ne se modifie plus : on la corrige par contrepassation.
+alter table public.ecritures add column if not exists statut text not null default 'brouillon' check (statut in ('brouillon','validee'));
+alter table public.ecritures add column if not exists valide_le date;
+alter table public.ecritures add column if not exists contrepasse text check (contrepasse ~ '^[A-Za-z0-9_-]{1,40}$');
+
+-- Exercices comptables : un exercice clôturé verrouille sa période.
+create table if not exists public.exercices(
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  id text not null check (id ~ '^[A-Za-z0-9_-]{1,40}$'),
+  debut date not null,
+  fin date not null,
+  cloture boolean not null default false,
+  cloture_le timestamptz,
+  check (fin >= debut),
+  primary key (entreprise_id, id)
+);
 
 create table if not exists public.lignes(
   entreprise_id uuid not null,
@@ -121,6 +137,11 @@ $$;
 create or replace function public.peut_ecrire(p_entreprise uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce(public.mon_role(p_entreprise) in ('proprietaire','comptable'), false)
+$$;
+
+create or replace function public.periode_close(p_entreprise uuid, p_date date) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists(select 1 from public.exercices where entreprise_id = p_entreprise and cloture and p_date between debut and fin)
 $$;
 
 -- Montant en unités (ex. 1234.5) -> centimes entiers. Refuse plus de 2 décimales.
@@ -203,11 +224,23 @@ begin
     raise exception 'Écriture %: débit (%) et crédit (%) ne sont pas égaux', e->>'id', td / 100.0, tc / 100.0 using errcode = '22023';
   end if;
 
+  if coalesce(e->>'statut', 'brouillon') not in ('brouillon','validee') then
+    raise exception 'Écriture %: statut invalide', e->>'id' using errcode = '22023';
+  end if;
   select to_jsonb(x) into avant from public.ecritures x where entreprise_id = p_entreprise and id = e->>'id';
-  insert into public.ecritures(entreprise_id, id, date, piece, libelle, lien, maj_le, maj_par)
-    values (p_entreprise, e->>'id', (e->>'date')::date, coalesce(e->>'piece', ''), e->>'libelle', e->>'lien', now(), auth.uid())
+  if avant->>'statut' = 'validee' then
+    raise exception 'Écriture % validée : elle ne peut plus être modifiée. Corrigez-la par une contrepassation.', e->>'id' using errcode = '55000';
+  end if;
+  if public.periode_close(p_entreprise, (e->>'date')::date)
+     or (avant is not null and public.periode_close(p_entreprise, (avant->>'date')::date)) then
+    raise exception 'Écriture %: la période est clôturée', e->>'id' using errcode = '55000';
+  end if;
+  insert into public.ecritures(entreprise_id, id, date, piece, libelle, lien, statut, valide_le, contrepasse, maj_le, maj_par)
+    values (p_entreprise, e->>'id', (e->>'date')::date, coalesce(e->>'piece', ''), e->>'libelle', e->>'lien',
+            coalesce(e->>'statut', 'brouillon'), case when e->>'statut' = 'validee' then current_date end, e->>'contrepasse', now(), auth.uid())
     on conflict (entreprise_id, id) do update
       set date = excluded.date, piece = excluded.piece, libelle = excluded.libelle, lien = excluded.lien,
+          statut = excluded.statut, valide_le = excluded.valide_le, contrepasse = excluded.contrepasse,
           maj_le = now(), maj_par = auth.uid();
   delete from public.lignes where entreprise_id = p_entreprise and ecriture_id = e->>'id';
   for l in select * from jsonb_array_elements(e->'lignes') loop
@@ -233,6 +266,12 @@ begin
            where y.entreprise_id = p_entreprise and y.ecriture_id = p_id))
     into avant from public.ecritures x where entreprise_id = p_entreprise and id = p_id;
   if avant is null then return; end if;
+  if avant->>'statut' = 'validee' then
+    raise exception 'Écriture % validée : elle ne peut plus être supprimée. Annulez-la par une contrepassation.', p_id using errcode = '55000';
+  end if;
+  if public.periode_close(p_entreprise, (avant->>'date')::date) then
+    raise exception 'Écriture %: la période est clôturée', p_id using errcode = '55000';
+  end if;
   delete from public.ecritures where entreprise_id = p_entreprise and id = p_id;
   insert into public.journal_audit(entreprise_id, qui, action, objet, avant)
     values (p_entreprise, auth.uid(), 'suppression', 'ecriture ' || p_id, avant);
@@ -281,6 +320,53 @@ begin
   end if;
 end $$;
 
+-- Crée ou modifie un exercice. Un exercice clôturé ne se modifie plus et ne se rouvre pas.
+-- La clôture exige que toutes les écritures de la période soient validées.
+create or replace function public.enregistrer_exercice(p_entreprise uuid, p_exercice jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare x jsonb := p_exercice; av public.exercices; d date; f date; c boolean;
+begin
+  if not public.peut_ecrire(p_entreprise) then
+    raise exception 'Accès refusé à cette entreprise' using errcode = '42501';
+  end if;
+  if coalesce(x->>'debut', '') !~ '^\d{4}-\d{2}-\d{2}$' or coalesce(x->>'fin', '') !~ '^\d{4}-\d{2}-\d{2}$' then
+    raise exception 'Exercice: dates invalides' using errcode = '22023';
+  end if;
+  d := (x->>'debut')::date; f := (x->>'fin')::date; c := coalesce((x->>'cloture')::boolean, false);
+  select * into av from public.exercices where entreprise_id = p_entreprise and id = x->>'id';
+  if found and av.cloture then
+    raise exception 'Exercice du % au % clôturé : il ne peut plus être modifié', av.debut, av.fin using errcode = '55000';
+  end if;
+  if exists(select 1 from public.exercices where entreprise_id = p_entreprise and id <> x->>'id' and d <= fin and debut <= f) then
+    raise exception 'Exercice: chevauche un exercice existant' using errcode = '22023';
+  end if;
+  if c and exists(select 1 from public.ecritures where entreprise_id = p_entreprise and date between d and f and statut <> 'validee') then
+    raise exception 'Clôture impossible : des écritures de l''exercice sont encore au brouillard' using errcode = '55000';
+  end if;
+  insert into public.exercices(entreprise_id, id, debut, fin, cloture, cloture_le)
+    values (p_entreprise, x->>'id', d, f, c, case when c then now() end)
+    on conflict (entreprise_id, id) do update
+      set debut = excluded.debut, fin = excluded.fin, cloture = excluded.cloture, cloture_le = excluded.cloture_le;
+  insert into public.journal_audit(entreprise_id, qui, action, objet, avant, apres)
+    values (p_entreprise, auth.uid(), case when c then 'cloture' when av.id is null then 'creation' else 'modification' end,
+            'exercice ' || (x->>'id'), case when av.id is not null then to_jsonb(av) end, x);
+end $$;
+
+create or replace function public.supprimer_exercice(p_entreprise uuid, p_id text)
+returns void language plpgsql security definer set search_path = public as $$
+declare av public.exercices;
+begin
+  if not public.peut_ecrire(p_entreprise) then
+    raise exception 'Accès refusé à cette entreprise' using errcode = '42501';
+  end if;
+  select * into av from public.exercices where entreprise_id = p_entreprise and id = p_id;
+  if not found then return; end if;
+  if av.cloture then raise exception 'Exercice clôturé : il ne peut pas être supprimé' using errcode = '55000'; end if;
+  delete from public.exercices where entreprise_id = p_entreprise and id = p_id;
+  insert into public.journal_audit(entreprise_id, qui, action, objet, avant)
+    values (p_entreprise, auth.uid(), 'suppression', 'exercice ' || p_id, to_jsonb(av));
+end $$;
+
 -- Ajoute un collaborateur déjà inscrit (réservé au propriétaire).
 create or replace function public.inviter_membre(p_entreprise uuid, p_email text, p_role text)
 returns void language plpgsql security definer set search_path = public, auth as $$
@@ -309,22 +395,24 @@ alter table public.factures enable row level security;
 alter table public.comptes_perso enable row level security;
 alter table public.abonnements enable row level security;
 alter table public.journal_audit enable row level security;
+alter table public.exercices enable row level security;
 
 -- Aucun accès sans connexion.
 revoke all on all tables in schema public from anon;
 revoke all on all functions in schema public from anon, public;
 revoke all on public.profils, public.entreprises, public.membres, public.ecritures, public.lignes,
-  public.factures, public.comptes_perso, public.abonnements, public.journal_audit from authenticated;
+  public.factures, public.comptes_perso, public.abonnements, public.journal_audit, public.exercices from authenticated;
 
 grant select, update(nom, tel, pays) on public.profils to authenticated;
 grant select, update(nom, pays, devise, params) on public.entreprises to authenticated;
 grant select on public.membres, public.ecritures, public.lignes, public.factures,
-  public.abonnements, public.journal_audit to authenticated;
+  public.abonnements, public.journal_audit, public.exercices to authenticated;
 grant select, insert, update, delete on public.comptes_perso to authenticated;
 grant execute on function public.mon_role(uuid), public.peut_ecrire(uuid),
   public.creer_entreprise(text, text, text, jsonb), public.enregistrer_ecriture(uuid, jsonb),
   public.supprimer_ecriture(uuid, text), public.enregistrer_facture(uuid, jsonb),
-  public.supprimer_facture(uuid, text), public.inviter_membre(uuid, text, text) to authenticated;
+  public.supprimer_facture(uuid, text), public.inviter_membre(uuid, text, text),
+  public.periode_close(uuid, date), public.enregistrer_exercice(uuid, jsonb), public.supprimer_exercice(uuid, text) to authenticated;
 
 drop policy if exists profil_lire on public.profils;
 create policy profil_lire on public.profils for select to authenticated using (id = auth.uid());
@@ -348,6 +436,8 @@ drop policy if exists factures_lire on public.factures;
 create policy factures_lire on public.factures for select to authenticated using (public.mon_role(entreprise_id) is not null);
 drop policy if exists audit_lire on public.journal_audit;
 create policy audit_lire on public.journal_audit for select to authenticated using (public.mon_role(entreprise_id) is not null);
+drop policy if exists exercices_lire on public.exercices;
+create policy exercices_lire on public.exercices for select to authenticated using (public.mon_role(entreprise_id) is not null);
 
 drop policy if exists comptes_lire on public.comptes_perso;
 create policy comptes_lire on public.comptes_perso for select to authenticated using (public.mon_role(entreprise_id) is not null);
