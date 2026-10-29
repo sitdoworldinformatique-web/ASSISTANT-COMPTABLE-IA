@@ -14,17 +14,21 @@ Les tests automatisés lisent ce bloc directement dans `index.html` :
 npm test
 ```
 
-(Node.js 20 ou plus récent, aucune dépendance à installer.) Ils tournent aussi sur GitHub à chaque PR.
+(Node.js 20 ou plus récent ; lancez `npm ci` une première fois.) Ils tournent aussi sur GitHub à chaque PR.
 
 ## Validation, contrepassation et clôture
 
 Une écriture saisie est d'abord au **brouillard** : elle reste modifiable. Une fois **validée**, elle ne peut plus
 être modifiée ni supprimée : on la corrige par **contrepassation** (écriture inverse, l'originale reste visible).
 Les **exercices comptables** se définissent dans Paramètres ; la clôture d'un exercice exige que toutes ses
-écritures soient validées et verrouille sa période. Avec Supabase, le serveur applique les mêmes règles.
+écritures soient validées et verrouille sa période. En ligne, la fonction serveur Appwrite applique les mêmes règles.
 
-## Comptes et données en ligne (Supabase)
+## Comptes et données en ligne (Appwrite)
 
 Facultatif : sans réglage, tout reste dans le navigateur. Pour de vrais comptes, des données partagées
-entre appareils et l'isolation entre entreprises, suivez [supabase/LISEZMOI.md](supabase/LISEZMOI.md).
-Le schéma de la base est dans `supabase/schema.sql`, ses tests dans `tests/sql/` (`npm run test:base`).
+entre appareils et l'isolation entre entreprises, suivez [appwrite/LISEZMOI.md](appwrite/LISEZMOI.md).
+
+L'application ne fait que lire la base ; toute écriture passe par la fonction `appwrite/fonction`, qui
+reprend le moteur de `index.html` (copie mise à jour par `npm run fonction`) et refuse ce qui n'est pas
+conforme : écriture déséquilibrée, écriture validée modifiée, période clôturée, entreprise d'un autre.
+Ses tests (`tests/fonction.test.mjs`) tournent avec `npm test`, sur une imitation d'Appwrite en mémoire.

@@ -512,55 +512,69 @@ let ui={vue:"dashboard",du:"",au:"",theme:"",gl:"",mode:"simple",q:"",jq:""};
 try{Object.assign(ui,JSON.parse(localStorage.getItem(UIKEY)||"{}"))}catch(e){}
 const saveUi=()=>{try{localStorage.setItem(UIKEY,JSON.stringify(ui))}catch(e){}};
 
-// ---------- Comptes et données en ligne (Supabase) ----------
-// Laissez url et cle vides pour tout garder dans ce navigateur, comme avant.
-// La clé à mettre ici est la clé publique « anon » (Supabase > Project Settings > API), jamais la clé service_role.
-// Base à créer avec supabase/schema.sql (voir supabase/LISEZMOI.md).
-const SUPABASE={url:"",cle:""};
+// ---------- Comptes et données en ligne (Appwrite) ----------
+// Tant que « fonction » est vide, tout reste dans ce navigateur, comme avant.
+// Ces valeurs viennent de la console Appwrite (voir appwrite/LISEZMOI.md) ; aucune n'est secrète.
+// L'application ne fait que lire : toute écriture passe par la fonction serveur, qui applique les contrôles.
+const APPWRITE={endpoint:"https://fra.cloud.appwrite.io/v1",projet:"6ae2faf3002f5b7a082c",fonction:"compteassist"};
 const Nuage=(()=>{
-  const SKEY="compteassist.session",MKEY="compteassist.miroir";
+  const SDK="https://cdn.jsdelivr.net/npm/appwrite@28.3.0/dist/iife/sdk.js",BASE="compteassist",MKEY="compteassist.miroir",PAQUET=50;
   const lire=k=>{try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e){return null}};
   const ecrire=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-  let session=lire(SKEY),miroir=lire(MKEY),etat={code:"",texte:""},minuterie=null,enCours=null,encore=false;
-  const actif=()=>!!(SUPABASE.url&&SUPABASE.cle);
-  const connecte=()=>actif()&&!!session&&!!(acces.entreprise);
-  const garderSession=s=>{if(s&&!s.expires_at)s.expires_at=Math.floor(Date.now()/1000)+(s.expires_in||3600);session=s;ecrire(SKEY,s)};
+  let miroir=lire(MKEY),etat={code:"",texte:""},minuterie=null,enCours=null,encore=false,sdk=null,jeton=null;
+  const actif=()=>!!(APPWRITE.endpoint&&APPWRITE.projet&&APPWRITE.fonction);
+  const connecte=()=>actif()&&!!acces.connecte&&!!acces.entreprise;
   const garderMiroir=()=>ecrire(MKEY,miroir);
   function signaler(code,texte){etat={code,texte};const el=$("nuage");if(el)el.innerHTML=texteEtat()}
   const texteEtat=()=>!connecte()?"":`<small style="display:block;margin-top:4px;text-transform:none;letter-spacing:0;color:${etat.code==="erreur"?"#fca5a5":"var(--sideink)"}">${etat.code==="ok"?"☁ Données enregistrées en ligne":etat.code==="envoi"?"☁ Enregistrement en ligne…":etat.code==="attente"?"☁ Hors ligne : "+esc(etat.texte):etat.code==="erreur"?"⚠ "+esc(etat.texte):"☁ En ligne"}</small>`;
+  const reseau=m=>{const x=new Error(m);x.reseau=true;return x};
 
-  // Traduit les messages d'erreur courants de Supabase.
-  function message(d,statut){
-    const m=(d&&(d.message||d.msg||d.error_description||d.error))||"";
-    if(/Invalid login credentials/i.test(m))return "E-mail ou mot de passe incorrect.";
-    if(/already registered|already exists/i.test(m))return "Un compte existe déjà avec cet e-mail : connectez-vous.";
-    if(/Email not confirmed/i.test(m))return "Confirmez d'abord votre adresse e-mail avec le lien reçu, puis connectez-vous.";
-    if(/Password should be/i.test(m))return "Mot de passe trop faible pour le serveur (6 caractères minimum).";
-    if(/JWT expired/i.test(m)||statut===401)return "Session expirée : reconnectez-vous.";
-    return m||"Erreur du serveur ("+statut+").";
+  // Le module Appwrite n'est chargé que si la connexion en ligne est configurée.
+  function charger(){
+    if(sdk)return sdk;
+    sdk=new Promise((ok,ko)=>{
+      const init=()=>{const A=window.Appwrite,c=new A.Client().setEndpoint(APPWRITE.endpoint).setProject(APPWRITE.projet);
+        return {A,compte:new A.Account(c),tables:new A.TablesDB(c),fonctions:new A.Functions(c)}};
+      if(window.Appwrite)return ok(init());
+      const s=document.createElement("script");s.src=SDK;
+      s.onload=()=>ok(init());s.onerror=()=>{sdk=null;ko(reseau("Pas de connexion Internet."))};
+      document.head.appendChild(s);
+    });
+    return sdk;
   }
-  async function appel(chemin,{methode="GET",corps,jeton=true,prefer}={}){
-    if(jeton&&session&&session.expires_at*1000<Date.now()+60000)await rafraichir();
-    let r;
-    try{r=await fetch(SUPABASE.url.replace(/\/+$/,"")+chemin,{method:methode,
-      headers:{apikey:SUPABASE.cle,"Content-Type":"application/json",Authorization:"Bearer "+(jeton&&session?session.access_token:SUPABASE.cle),...(prefer?{Prefer:prefer}:{})},
-      body:corps===undefined?undefined:JSON.stringify(corps)})}
-    catch(e){const x=new Error("Pas de connexion Internet.");x.reseau=true;throw x}
-    const t=await r.text();let d=null;try{d=t?JSON.parse(t):null}catch(e){d=t}
-    if(!r.ok){const x=new Error(message(d,r.status));x.statut=r.status;throw x}
+  // Traduit les erreurs courantes d'Appwrite.
+  function traduire(e){
+    if(e&&(e.reseau||e.statut))return e;
+    const code=e&&e.code,m=(e&&e.message)||"",t=(e&&e.type)||"";
+    if(!code)return reseau("Pas de connexion Internet.");
+    let texte=m||"Erreur du serveur ("+code+").";
+    if(t==="user_invalid_credentials"||/invalid credentials/i.test(m))texte="E-mail ou mot de passe incorrect.";
+    else if(t==="user_already_exists"||(code===409&&/already exists/i.test(m)))texte="Un compte existe déjà avec cet e-mail : connectez-vous.";
+    else if(t==="password_recently_used"||t==="password_personal_data"||(code===400&&/password/i.test(m)))texte="Mot de passe refusé par le serveur : 8 caractères minimum, sans votre nom ni votre e-mail.";
+    else if(code===429)texte="Trop d'essais : patientez quelques minutes.";
+    else if(code===401)texte="Session expirée : reconnectez-vous.";
+    const x=new Error(texte);x.statut=code;return x;
+  }
+  const appel=async f=>{try{return await f(await charger())}catch(e){throw traduire(e)}};
+
+  // Appel de la fonction serveur, avec un jeton prouvant l'identité de l'utilisateur.
+  async function fonction(corps,reessai=true){
+    if(!jeton||jeton.fin<Date.now())jeton={v:(await appel(({compte})=>compte.createJWT({duration:900}))).jwt,fin:Date.now()+600000};
+    const x=await appel(({fonctions})=>fonctions.createExecution({functionId:APPWRITE.fonction,body:JSON.stringify({...corps,jwt:jeton.v}),async:false}));
+    let d=null;try{d=JSON.parse(x.responseBody||"null")}catch(e){}
+    const statut=x.responseStatusCode||0;
+    if(statut===401&&reessai){jeton=null;return fonction(corps,false)}
+    if(statut>=400||x.status==="failed"||!d||typeof d!=="object"){
+      const err=new Error((d&&d.erreur)||"Le serveur ne répond pas correctement, réessayez.");err.statut=statut>=400?statut:500;throw err}
     return d;
   }
-  async function rafraichir(){
-    const s=session;session=null;
-    try{garderSession(await appel("/auth/v1/token?grant_type=refresh_token",{methode:"POST",corps:{refresh_token:s.refresh_token},jeton:false}))}
-    catch(e){if(e.reseau){session=s;throw e}garderSession(null);throw e}
-  }
-  const rpc=(f,args)=>appel("/rest/v1/rpc/"+f,{methode:"POST",corps:args});
-  async function toutLire(table,select){
-    const L=[];
-    for(let n=0;;n+=1000){
-      const p=await appel(`/rest/v1/${table}?entreprise_id=eq.${acces.entreprise}&select=${select}&limit=1000&offset=${n}`);
-      L.push(...p);if(p.length<1000)return L;
+  async function toutLire(table,limite=500){
+    const L=[];let apres=null;
+    for(;;){
+      const r=await appel(({A,tables})=>{const q=[A.Query.equal("entreprise",[acces.entreprise]),A.Query.limit(limite)];if(apres)q.push(A.Query.cursorAfter(apres));
+        return tables.listRows({databaseId:BASE,tableId:table,queries:q})});
+      L.push(...r.rows);
+      if(r.rows.length<limite||limite<500)return L;apres=r.rows[r.rows.length-1].$id;
     }
   }
 
@@ -571,37 +585,44 @@ const Nuage=(()=>{
   const formeFacture=f=>Object.assign({},f,{ht:Moteur.arrondir(f.ht),tva:Moteur.arrondir(f.tva),ttc:Moteur.arrondir(f.ttc)});
   function photo(d){
     const m={e:{},f:{},c:{},x:{},p:JSON.stringify(d.params)};
-    d.exercices.forEach(x=>m.x[x.id]=JSON.stringify({id:x.id,debut:x.debut,fin:x.fin,cloture:!!x.cloture}));
     d.ecritures.forEach(e=>m.e[e.id]=JSON.stringify(formeEcriture(e)));
     d.factures.forEach(f=>m.f[f.num]=JSON.stringify(formeFacture(f)));
     d.comptes.forEach(c=>m.c[c.num]=c.nom);
+    d.exercices.forEach(x=>m.x[x.id]=JSON.stringify({id:x.id,debut:x.debut,fin:x.fin,cloture:!!x.cloture}));
     return m;
   }
 
-  // Envoie au serveur ce qui a changé depuis le dernier envoi réussi.
+  // Envoie au serveur ce qui a changé depuis le dernier envoi réussi, par paquets.
   async function pousser(){
     if(!connecte())return;
     if(enCours){encore=true;return enCours}
     enCours=(async()=>{
-      const eid=acces.entreprise,a=Object.assign({e:{},f:{},c:{},x:{},p:""},miroir),b=photo(db);let refus=[];
+      const a=Object.assign({e:{},f:{},c:{},x:{},p:""},miroir),b=photo(db),ops=[],refus=[];
+      const ajout=(type,donnees,fait)=>ops.push({type,donnees,fait});
+      for(const id in a.e)if(!(id in b.e))ajout("supprEcriture",{id},()=>delete a.e[id]);
+      for(const n in a.f)if(!(n in b.f))ajout("supprFacture",{num:n},()=>delete a.f[n]);
+      for(const id in b.e)if(a.e[id]!==b.e[id])ajout("ecriture",JSON.parse(b.e[id]),()=>a.e[id]=b.e[id]);
+      for(const n in b.f)if(a.f[n]!==b.f[n])ajout("facture",JSON.parse(b.f[n]),()=>a.f[n]=b.f[n]);
+      for(const n in a.c)if(!(n in b.c))ajout("supprCompte",{num:n},()=>delete a.c[n]);
+      for(const n in b.c)if(a.c[n]!==b.c[n])ajout("compte",{num:n,nom:b.c[n]},()=>a.c[n]=b.c[n]);
+      // Les exercices passent après les écritures : une clôture exige que toutes ses écritures soient validées.
+      for(const id in a.x)if(!(id in b.x))ajout("supprExercice",{id},()=>delete a.x[id]);
+      for(const id in b.x)if(a.x[id]!==b.x[id])ajout("exercice",JSON.parse(b.x[id]),()=>a.x[id]=b.x[id]);
+      if(a.p!==b.p)ajout("params",JSON.parse(b.p),()=>a.p=b.p);
+      if(!ops.length){signaler("ok");return}
       signaler("envoi");
       try{
-        const pas=async(fn,ok)=>{try{await fn();ok()}catch(e){if(e.reseau||e.statut===401||!e.statut)throw e;refus.push(e.message)}};
-        for(const id in a.e)if(!(id in b.e))await pas(()=>rpc("supprimer_ecriture",{p_entreprise:eid,p_id:id}),()=>delete a.e[id]);
-        for(const n in a.f)if(!(n in b.f))await pas(()=>rpc("supprimer_facture",{p_entreprise:eid,p_num:n}),()=>delete a.f[n]);
-        for(const id in b.e)if(a.e[id]!==b.e[id])await pas(()=>rpc("enregistrer_ecriture",{p_entreprise:eid,p_ecriture:JSON.parse(b.e[id])}),()=>a.e[id]=b.e[id]);
-        for(const n in b.f)if(a.f[n]!==b.f[n])await pas(()=>rpc("enregistrer_facture",{p_entreprise:eid,p_facture:JSON.parse(b.f[n])}),()=>a.f[n]=b.f[n]);
-        for(const n in a.c)if(!(n in b.c))await pas(()=>appel(`/rest/v1/comptes_perso?entreprise_id=eq.${eid}&num=eq.${encodeURIComponent(n)}`,{methode:"DELETE"}),()=>delete a.c[n]);
-        for(const n in b.c)if(a.c[n]!==b.c[n])await pas(()=>appel(`/rest/v1/comptes_perso?on_conflict=entreprise_id,num`,{methode:"POST",prefer:"resolution=merge-duplicates",corps:{entreprise_id:eid,num:n,nom:b.c[n]}}),()=>a.c[n]=b.c[n]);
-        // Les exercices passent après les écritures : une clôture exige que toutes ses écritures soient validées.
-        for(const id in a.x)if(!(id in b.x))await pas(()=>rpc("supprimer_exercice",{p_entreprise:eid,p_id:id}),()=>delete a.x[id]);
-        for(const id in b.x)if(a.x[id]!==b.x[id])await pas(()=>rpc("enregistrer_exercice",{p_entreprise:eid,p_exercice:JSON.parse(b.x[id])}),()=>a.x[id]=b.x[id]);
-        if(a.p!==b.p){const p=db.params;await pas(()=>appel(`/rest/v1/entreprises?id=eq.${eid}`,{methode:"PATCH",corps:{nom:p.societe||"Mon entreprise",pays:p.pays||null,devise:p.devise,params:p}}),()=>a.p=b.p)}
-        miroir=a;garderMiroir();
+        for(let i=0;i<ops.length;i+=PAQUET){
+          const P=ops.slice(i,i+PAQUET);
+          const r=await fonction({action:"lot",entreprise:acces.entreprise,operations:P.map(({type,donnees})=>({type,donnees}))});
+          r.resultats.forEach((x,j)=>x.ok?P[j].fait():refus.push(x.erreur));
+          miroir=a;garderMiroir();
+        }
         refus.length?signaler("erreur",(refus.length>1?refus.length+" éléments refusés par le serveur. ":"Refusé par le serveur : ")+refus[0]):signaler("ok");
       }catch(e){
         miroir=a;garderMiroir();
-        if(e.statut===401||!session){signaler("erreur","Session expirée : reconnectez-vous pour envoyer vos modifications.")}
+        if(e.statut===401)signaler("erreur","Session expirée : reconnectez-vous pour envoyer vos modifications.");
+        else if(e.statut===403)signaler("erreur",e.message);
         else signaler("attente","modifications enregistrées sur cet appareil, envoi dès le retour de la connexion.");
       }
     })();
@@ -611,20 +632,20 @@ const Nuage=(()=>{
 
   // Charge le dossier de l'entreprise depuis le serveur et remplace la copie locale.
   async function tirer(){
-    const [ent]=await appel(`/rest/v1/entreprises?id=eq.${acces.entreprise}&select=nom,pays,devise,params`);
-    if(!ent)throw new Error("Entreprise introuvable sur le serveur.");
-    const E=await toutLire("ecritures","id,date,piece,libelle,lien,statut,valide_le,contrepasse,lignes(rang,compte,debit,credit)&order=date,id");
-    const X=await toutLire("exercices","id,debut,fin,cloture,cloture_le&order=debut");
-    const F=await toutLire("factures","donnees&order=date,num");
-    const C=await toutLire("comptes_perso","num,nom&order=num");
-    const d=normaliser({
-      ecritures:E.map(e=>{const x={id:e.id,date:e.date,piece:e.piece,libelle:e.libelle,
-        lignes:e.lignes.sort((a,b)=>a.rang-b.rang).map(l=>({compte:l.compte,debit:Moteur.enUnites(l.debit),credit:Moteur.enUnites(l.credit)}))};
-        if(e.lien)x.lien=e.lien;if(e.statut==="validee"){x.statut="validee";x.valideeLe=e.valide_le}if(e.contrepasse)x.contrepasse=e.contrepasse;return x}),
-      exercices:X.map(x=>({id:x.id,debut:x.debut,fin:x.fin,cloture:x.cloture,...(x.cloture_le?{clotureLe:x.cloture_le.slice(0,10)}:{})})),
-      factures:F.map(f=>f.donnees),comptes:C,
-      params:Object.assign({},ent.params,{societe:ent.nom,pays:ent.pays||"",devise:ent.devise})});
-    db=d;try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}
+    const ent=await appel(({tables})=>tables.getRow({databaseId:BASE,tableId:"entreprises",rowId:acces.entreprise}));
+    const [E,F,C,X]=await Promise.all(["ecritures","factures","comptes","exercices"].map(t=>toutLire(t)));
+    const unites=c=>Moteur.enUnites(Number(c)||0);
+    let params={};try{params=JSON.parse(ent.params||"{}")}catch(e){}
+    db=normaliser({
+      ecritures:E.map(r=>{const x={id:r.cle,date:r.date,piece:r.piece||"",libelle:r.libelle,
+        lignes:JSON.parse(r.lignes||"[]").map(l=>({compte:l.compte,debit:unites(l.debit),credit:unites(l.credit)}))};
+        if(r.lien)x.lien=r.lien;if(r.statut==="validee"){x.statut="validee";x.valideeLe=r.valideLe}if(r.contrepasse)x.contrepasse=r.contrepasse;return x})
+        .sort((a,b)=>a.date.localeCompare(b.date)),
+      factures:F.map(r=>JSON.parse(r.donnees)).sort((a,b)=>a.date.localeCompare(b.date)),
+      comptes:C.map(r=>({num:r.cle,nom:r.nom})),
+      exercices:X.map(r=>({id:r.cle,debut:r.debut,fin:r.fin,cloture:!!r.cloture,...(r.clotureLe?{clotureLe:r.clotureLe}:{})})),
+      params:Object.assign({},params,{societe:ent.nom,pays:ent.pays||"",devise:ent.devise})});
+    garderLocal();
     miroir=photo(db);garderMiroir();signaler("ok");
   }
 
@@ -635,14 +656,13 @@ const Nuage=(()=>{
   // Après la connexion : ouvre l'entreprise de l'utilisateur, ou la crée.
   // Les données de ce navigateur ne partent en ligne que si l'utilisateur l'accepte.
   async function ouvrir(){
-    const L=await appel("/rest/v1/membres?select=entreprise_id,role&order=ajoute_le");
-    const lie=miroir&&L.find(m=>m.entreprise_id===acces.entreprise);
+    const L=(await fonction({action:"mesEntreprises"})).entreprises;
+    const lie=miroir&&L.find(m=>m.id===acces.entreprise);
     if(lie){acces.role=lie.role;saveAcces();await pousser();await tirer();return}
     const m=L[0],ne=db.ecritures.length,nf=db.factures.length;let vide=true;
     if(m){
-      acces.entreprise=m.entreprise_id;acces.role=m.role;saveAcces();
-      vide=!(await appel(`/rest/v1/ecritures?entreprise_id=eq.${m.entreprise_id}&select=id&limit=1`)).length
-        &&!(await appel(`/rest/v1/factures?entreprise_id=eq.${m.entreprise_id}&select=num&limit=1`)).length;
+      acces.entreprise=m.id;acces.role=m.role;saveAcces();
+      vide=!(await toutLire("ecritures",1)).length&&!(await toutLire("factures",1)).length;
     }
     if(ne+nf)try{localStorage.setItem(KEY+".avant-connexion",JSON.stringify(db))}catch(e){}
     const envoyer=ne+nf>0&&vide&&confirm(`Ce navigateur contient ${ne} écriture(s) et ${nf} facture(s) enregistrées hors ligne.\n\nOK : les ajouter à votre compte en ligne.\nAnnuler : ne pas les envoyer (une copie reste sur cet appareil).`);
@@ -650,8 +670,8 @@ const Nuage=(()=>{
     if(!envoyer)db=vierge();
     if(!m){
       const p=db.params;if(!p.pays&&acces.compte)p.pays=acces.compte.paysCode||"";
-      acces.entreprise=await rpc("creer_entreprise",{p_nom:p.societe||"Mon entreprise",p_pays:p.pays||"",p_devise:p.devise||PARAMS0.devise,p_params:p});
-      saveAcces();
+      acces.entreprise=(await fonction({action:"creerEntreprise",donnees:{nom:p.societe||"Mon entreprise",pays:p.pays||"",devise:p.devise||PARAMS0.devise,params:p}})).entreprise;
+      acces.role="proprietaire";saveAcces();
     }
     miroir={e:{},f:{},c:{},x:{},p:m?"":JSON.stringify(db.params)};garderLocal();
     await pousser();
@@ -661,15 +681,21 @@ const Nuage=(()=>{
     for(const k of ["e","f","c","x"]){const ak=a[k]||{};for(const x in b[k])if(ak[x]!==b[k][x])n++;for(const x in ak)if(!(x in b[k]))n++}
     return n+(a.p!==b.p?1:0)};
 
+  async function ouvrirSession(email,mdp){
+    // Une ancienne session restée ouverte empêcherait la nouvelle : on la ferme d'abord.
+    try{await (await charger()).compte.deleteSession({sessionId:"current"})}catch(e){}
+    jeton=null;
+    await appel(({compte})=>compte.createEmailPasswordSession({email,password:mdp}));
+  }
   async function inscrire(email,mdp,infos){
-    const d=await appel("/auth/v1/signup",{methode:"POST",corps:{email,password:mdp,data:infos},jeton:false});
-    if(!d||!d.access_token)return {confirmer:true};
-    garderSession(d);return {confirmer:false};
+    await appel(({A,compte})=>compte.create({userId:A.ID.unique(),email,password:mdp,name:infos.nom}));
+    await ouvrirSession(email,mdp);
+    try{await appel(({compte})=>compte.updatePrefs({prefs:{tel:infos.tel,pays:infos.pays}}))}catch(e){}
   }
   async function connecter(email,mdp){
-    garderSession(await appel("/auth/v1/token?grant_type=password",{methode:"POST",corps:{email,password:mdp},jeton:false}));
-    const p=(await appel(`/rest/v1/profils?select=nom,tel,pays`))[0]||{};
-    return p;
+    await ouvrirSession(email,mdp);
+    const u=await appel(({compte})=>compte.get());
+    return {nom:u.name,tel:(u.prefs||{}).tel||"",pays:(u.prefs||{}).pays||""};
   }
   // Déconnexion : les données quittent ce navigateur (elles restent sur le serveur).
   async function deconnecter(){
@@ -677,8 +703,9 @@ const Nuage=(()=>{
     if(connecte())await pousser();
     const n=enAttente();
     if(n&&!confirm(`${n} modification(s) n'ont pas encore été envoyées au serveur et seront perdues. Se déconnecter quand même ?`))return false;
-    try{if(session)await appel("/auth/v1/logout",{methode:"POST"})}catch(e){}
-    garderSession(null);miroir=null;garderMiroir();
+    try{await (await charger()).compte.deleteSession({sessionId:"current"})}catch(e){}
+    try{localStorage.removeItem("cookieFallback")}catch(e){}
+    jeton=null;miroir=null;garderMiroir();
     acces.entreprise=null;acces.role=null;db=vierge();garderLocal();signaler("","");
     return true;
   }
@@ -1571,7 +1598,7 @@ function formInscription(){
     <div><label>E-mail</label><input id="i_email" type="email" autocomplete="email"></div>
     <div><label>Pays</label><select id="i_pays" onchange="choixPaysInscription()">${optionsPays("")}</select><div id="i_pnote" style="margin-top:6px"></div></div>
     <div><label>Téléphone</label><div style="display:flex;gap:6px"><span id="i_ind" class="btn" style="pointer-events:none;min-width:64px;justify-content:center">+…</span><input id="i_tel" type="tel" inputmode="tel" placeholder="Choisissez d'abord votre pays" autocomplete="tel-national" disabled></div></div>
-    <div><label>Mot de passe (6 caractères minimum)</label><input id="i_mdp" type="password" autocomplete="new-password"></div>
+    <div><label>Mot de passe (${Nuage.actif()?8:6} caractères minimum)</label><input id="i_mdp" type="password" autocomplete="new-password"></div>
     <div><label>Confirmer le mot de passe</label><input id="i_mdp2" type="password" autocomplete="new-password"></div>
    </div>
    <button class="btn p" style="width:100%;justify-content:center" onclick="inscrire()">Créer mon compte</button><div id="i_res"></div>
@@ -1606,7 +1633,8 @@ async function inscrire(){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v("email")))err.push("E-mail invalide.");
   if(!pays(v("pays")))err.push("Choisissez votre pays.");
   else if(!numeroIntl(v("pays"),v("tel")))err.push("Numéro de téléphone invalide pour ce pays (6 à 12 chiffres, sans l'indicatif).");
-  if($("i_mdp").value.length<6)err.push("Mot de passe trop court (6 caractères minimum).");
+  const mini=Nuage.actif()?8:6;
+  if($("i_mdp").value.length<mini)err.push(`Mot de passe trop court (${mini} caractères minimum).`);
   if($("i_mdp").value!==$("i_mdp2").value)err.push("Les deux mots de passe ne sont pas identiques.");
   if(!Nuage.actif()&&acces.compte&&acces.compte.email===v("email").toLowerCase())err.push("Un compte existe déjà avec cet e-mail : connectez-vous.");
   if(err.length){out.innerHTML=`<div class="msg bad">${err.join("<br>")}</div>`;return}
@@ -1614,10 +1642,8 @@ async function inscrire(){
     const email=v("email").toLowerCase(),tel=numeroIntl(v("pays"),v("tel"));
     out.innerHTML=`<div class="msg">Création du compte…</div>`;
     try{
-      const r=await Nuage.inscrire(email,$("i_mdp").value,{nom:v("nom"),tel,pays:v("pays")});
+      await Nuage.inscrire(email,$("i_mdp").value,{nom:v("nom"),tel,pays:v("pays")});
       acces.compte={nom:v("nom"),email,tel,pays:pays(v("pays"))[1],paysCode:v("pays"),cree:Date.now(),nuage:true};
-      if(r.confirmer){acces.connecte=false;saveAcces();afficherPorte("connexion");$("c_email").value=email;
-        $("c_res").innerHTML=`<div class="msg ok">Compte créé. Ouvrez le lien de confirmation reçu par e-mail, puis connectez-vous ici.</div>`;return}
       acces.connecte=true;saveAcces();
       if(!db.ecritures.length&&!db.params.pays){const x=pays(v("pays"));db.params.pays=x[0];db.params.devise=x[3];if(!db.params.tel)db.params.tel=tel}
       await Nuage.ouvrir();

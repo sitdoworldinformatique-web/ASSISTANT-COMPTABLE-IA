@@ -1,0 +1,9 @@
+{
+  "name": "compteassist-fonction",
+  "private": true,
+  "type": "module",
+  "main": "src/main.js",
+  "dependencies": {
+    "node-appwrite": "29.4.0"
+  }
+}

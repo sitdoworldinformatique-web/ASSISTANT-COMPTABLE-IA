@@ -3,7 +3,10 @@
   "private": true,
   "description": "Assistant comptable SYSCOHADA",
   "scripts": {
-    "test": "node --test tests/*.test.js",
-    "test:base": "tests/sql/lancer.sh"
+    "test": "node --test tests/*.test.js tests/*.test.mjs",
+    "fonction": "node scripts/copier-moteur.js"
+  },
+  "devDependencies": {
+    "node-appwrite": "29.4.0"
   }
 }
